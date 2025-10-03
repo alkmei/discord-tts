@@ -36,6 +36,8 @@ jobs:
         with:
           context: .
           push: true
-          tags: ${{ env.REGISTRY }}/alkmei/discord-tts:${{ github.sha }}
+          tags: |
+            ${{ env.REGISTRY }}/alkmei/discord-tts:${{ github.sha }}
+            ${{ env.REGISTRY }}/alkmei/discord-tts:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
