@@ -275,7 +275,7 @@ async def join_voice_channel(ctx: commands.Context[commands.Bot]) -> None:
         tts_bot.audio_players[guild_id] = False
 
         await ctx.send(
-            f"Joined {voice_channel.name}! Use `!s <message>` to convert text to speech. Multiple voices can speak simultaneously!"
+            f"Joined {voice_channel.name}! Use `!s <message>` to convert text to speech."
         )
 
     except discord.errors.ClientException as e:
@@ -412,7 +412,6 @@ async def help_command(ctx: commands.Context[commands.Bot]) -> None:
 `!help_tts` - Show this help message
 
 **Features:**
-- Multiple people can use `!s` simultaneously for overlapping speech
 - Each user gets their own unique voice
     """
     await ctx.send(help_text)
