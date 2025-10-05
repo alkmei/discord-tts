@@ -153,6 +153,41 @@ class TTSBot:
 tts_bot: TTSBot = TTSBot()
 
 
+def filter_non_text(text: str) -> str:
+    """
+    Filter content for muted users to only allow natural language.
+    Removes URLs, random character sequences, and other non-natural content.
+
+    Args:
+        text: The original message text
+
+    Returns:
+        Filtered text with only natural language content
+    """
+    import re
+
+    text = re.sub(r"<:(\w+):\d+>", r"\1", text)
+    # Remove URLs (http, https, www)
+    text = re.sub(
+        r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
+        "",
+        text,
+    )
+    text = re.sub(
+        r"www\.(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+",
+        "",
+        text,
+    )
+
+    # Remove Discord invite links
+    text = re.sub(r"discord\.gg/\S+", "", text)
+
+    # Remove excessive numbers (sequences of 12+ digits)
+    text = re.sub(r"\b\d{12,}\b", "", text)
+
+    return text.strip()
+
+
 async def check_muted_user_tts(message: discord.Message) -> None:
     """
     Check if the message author is muted and auto-convert their message to TTS.
@@ -220,8 +255,12 @@ async def check_muted_user_tts(message: discord.Message) -> None:
         # Format the speech text with the user's display name
         speech_text: str = f"{message.author.display_name} says: {message.content}"
 
+        logger.debug(f"TTS Request from {message.author}: {speech_text}")
+
         # Queue the TTS audio for playback
-        await tts_bot.speak_text(voice_client, speech_text, user_voice, guild_id)
+        await tts_bot.speak_text(
+            voice_client, filter_non_text(speech_text), user_voice, guild_id
+        )
 
 
 @bot.event
@@ -395,7 +434,37 @@ async def speak_text_command(ctx: commands.Context[commands.Bot], *, text: str) 
     user_voice: str = tts_bot.get_user_voice(ctx.author.id)
 
     speech_text: str = f"{ctx.author.display_name} says: {text} "
-    await tts_bot.speak_text(voice_client, speech_text, user_voice, guild_id)
+    logger.debug(f"TTS Request from {ctx.author}: {speech_text}")
+    await tts_bot.speak_text(
+        voice_client, filter_non_text(speech_text), user_voice, guild_id
+    )
+
+
+@bot.command(name="t")
+async def speak_no_prefix(ctx: commands.Context[commands.Bot], *, text: str) -> None:
+    """Convert text to speech without prefix (for muted users)"""
+    if not ctx.guild:
+        await ctx.send("This command can only be used in a server.")
+        return
+    guild_id: int = ctx.guild.id
+    voice_client: Optional[discord.VoiceClient] = tts_bot.voice_clients.get(guild_id)
+
+    if not voice_client or not voice_client.is_connected():
+        await ctx.send("I need to be in a voice channel first! Use `!join`")
+        return
+
+    # Check if this is a monitored channel
+    if (
+        guild_id not in tts_bot.monitored_channels
+        or ctx.channel.id != tts_bot.monitored_channels[guild_id]
+    ):
+        await ctx.send("I'm only providing TTS in the channel where I was summoned!")
+        return
+
+    user_voice: str = tts_bot.get_user_voice(ctx.author.id)
+
+    logger.debug(f"TTS Request from {ctx.author}: {text}")
+    await tts_bot.speak_text(voice_client, filter_non_text(text), user_voice, guild_id)
 
 
 @bot.command(name="help_tts")
@@ -408,34 +477,13 @@ async def help_command(ctx: commands.Context[commands.Bot]) -> None:
 `!s <message>` - Convert text to speech (multiple can overlap!)
 `!voice [voice_name]` - Set or view your TTS voice
 `!voices` - List all available voices
-`!test [text]` - Test TTS functionality
+`!t [text]` - Talk without a prefix
 `!help_tts` - Show this help message
 
 **Features:**
 - Each user gets their own unique voice
     """
     await ctx.send(help_text)
-
-
-@bot.command(name="test")
-async def test_tts(
-    ctx: commands.Context[commands.Bot], *, text: str = "This is a test message"
-) -> None:
-    """Test TTS functionality"""
-    if not ctx.guild:
-        await ctx.send("This command can only be used in a server.")
-        return
-
-    guild_id: int = ctx.guild.id
-    voice_client: Optional[discord.VoiceClient] = tts_bot.voice_clients.get(guild_id)
-
-    if not voice_client or not voice_client.is_connected():
-        await ctx.send("I need to be in a voice channel first! Use `!join`")
-        return
-
-    user_voice: str = tts_bot.get_user_voice(ctx.author.id)
-    await tts_bot.speak_text(voice_client, text, user_voice, guild_id)
-    await ctx.send("TTS test completed!")
 
 
 # Run the bot
