@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - master
+    paths:
+      - main.py
   workflow_dispatch:
 
 env:
