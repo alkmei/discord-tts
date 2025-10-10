@@ -26,6 +26,28 @@ intents.members = True
 bot: commands.Bot = commands.Bot(command_prefix="!", intents=intents)
 
 
+# Load available voices from ./voices.txt
+def load_voices_from_file(path: str = "./voices.txt") -> List[str]:
+    if not os.path.exists(path):
+        # Fallback to a default list if file is missing
+        return [
+            "en-US-AriaNeural",
+            "en-US-JennyNeural",
+            "en-US-GuyNeural",
+            "en-US-AndrewNeural",
+            "en-US-EmmaNeural",
+            "en-US-BrianNeural",
+            "en-GB-SoniaNeural",
+            "en-GB-RyanNeural",
+            "en-AU-NatashaNeural",
+        ]
+    with open(path, "r", encoding="utf-8") as f:
+        return [line.strip() for line in f if line.strip()]
+
+
+available_voices: List[str] = load_voices_from_file()
+
+
 class TTSBot:
     def __init__(self) -> None:
         self.voice_clients: Dict[int, discord.VoiceClient] = {}
@@ -60,15 +82,9 @@ class TTSBot:
         """Get voice for a user, assign default if none exists"""
         if user_id not in self.user_voices:
             # Assign a default voice (you can customize this logic)
-            voices: List[str] = [
-                "en-US-AriaNeural",
-                "en-US-JennyNeural",
-                "en-US-GuyNeural",
-                "en-US-AndrewNeural",
-                "en-US-EmmaNeural",
-                "en-US-BrianNeural",
+            self.user_voices[user_id] = available_voices[
+                user_id % len(available_voices)
             ]
-            self.user_voices[user_id] = voices[user_id % len(voices)]
             self.save_user_voices()
         return self.user_voices[user_id]
 
@@ -370,19 +386,6 @@ async def set_voice(
         await ctx.send(f"Your current voice is: {current_voice}")
         return
 
-    # List of available voices (customize as needed)
-    available_voices: List[str] = [
-        "en-US-AriaNeural",
-        "en-US-JennyNeural",
-        "en-US-GuyNeural",
-        "en-US-AndrewNeural",
-        "en-US-EmmaNeural",
-        "en-US-BrianNeural",
-        "en-GB-SoniaNeural",
-        "en-GB-RyanNeural",
-        "en-AU-NatashaNeural",
-    ]
-
     if voice_name in available_voices:
         tts_bot.user_voices[ctx.author.id] = voice_name
         tts_bot.save_user_voices()
@@ -395,17 +398,6 @@ async def set_voice(
 @bot.command(name="voices")
 async def list_voices(ctx: commands.Context[commands.Bot]) -> None:
     """List all available TTS voices"""
-    available_voices: List[str] = [
-        "en-US-AriaNeural",
-        "en-US-JennyNeural",
-        "en-US-GuyNeural",
-        "en-US-AndrewNeural",
-        "en-US-EmmaNeural",
-        "en-US-BrianNeural",
-        "en-GB-SoniaNeural",
-        "en-GB-RyanNeural",
-        "en-AU-NatashaNeural",
-    ]
     voices_list: str = "\n".join(available_voices)
     await ctx.send(f"Available voices:\n```{voices_list}```")
 
