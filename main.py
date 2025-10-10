@@ -399,7 +399,11 @@ async def set_voice(
 async def list_voices(ctx: commands.Context[commands.Bot]) -> None:
     """List all available TTS voices"""
     voices_list: str = "\n".join(available_voices)
-    await ctx.send(f"Available voices:\n```{voices_list}```")
+    # Send the voices.txt file as an attachment if it exists, otherwise send the list
+    if os.path.exists("./voices.txt"):
+        await ctx.send("Available voices:", file=discord.File("./voices.txt"))
+    else:
+        await ctx.send(f"Available voices:\n```{voices_list}```")
 
 
 @bot.command(name="s")
