@@ -10,6 +10,8 @@ from dotenv import load_dotenv
 
 from queue import Queue
 
+import edge_tts
+
 load_dotenv()
 
 # Set up logging
@@ -25,27 +27,14 @@ intents.members = True
 
 bot: commands.Bot = commands.Bot(command_prefix="!", intents=intents)
 
-
-# Load available voices from ./voices.txt
-def load_voices_from_file(path: str = "./voices.txt") -> List[str]:
-    if not os.path.exists(path):
-        # Fallback to a default list if file is missing
-        return [
-            "en-US-AriaNeural",
-            "en-US-JennyNeural",
-            "en-US-GuyNeural",
-            "en-US-AndrewNeural",
-            "en-US-EmmaNeural",
-            "en-US-BrianNeural",
-            "en-GB-SoniaNeural",
-            "en-GB-RyanNeural",
-            "en-AU-NatashaNeural",
-        ]
-    with open(path, "r", encoding="utf-8") as f:
-        return [line.strip() for line in f if line.strip()]
+available_voices: List[str] = []
 
 
-available_voices: List[str] = load_voices_from_file()
+async def fetch_available_voices():
+    global available_voices
+    voices = await edge_tts.voices.list_voices()
+    # If voices are objects, extract their names; adjust as needed
+    available_voices = [v["Name"] if "Name" in v else str(v) for v in voices]
 
 
 class TTSBot:
@@ -93,9 +82,6 @@ class TTSBot:
     ) -> None:
         """Convert text to speech and add to queue for simultaneous playback"""
         try:
-            # This uses edge-tts (install with: pip install edge-tts)
-            import edge_tts
-
             # Create temporary file for audio
             with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp_file:
                 tmp_path: str = tmp_file.name
@@ -271,6 +257,9 @@ async def check_muted_user_tts(message: discord.Message) -> None:
         # Format the speech text with the user's display name
         speech_text: str = f"{message.author.display_name} says: {message.content}"
 
+        if not message.content.strip():
+            return
+
         logger.debug(f"TTS Request from {message.author}: {speech_text}")
 
         # Queue the TTS audio for playback
@@ -430,6 +419,8 @@ async def speak_text_command(ctx: commands.Context[commands.Bot], *, text: str) 
     user_voice: str = tts_bot.get_user_voice(ctx.author.id)
 
     speech_text: str = f"{ctx.author.display_name} says: {text} "
+    if not text.strip():
+        return
     logger.debug(f"TTS Request from {ctx.author}: {speech_text}")
     await tts_bot.speak_text(
         voice_client, filter_non_text(speech_text), user_voice, guild_id
@@ -482,8 +473,8 @@ async def help_command(ctx: commands.Context[commands.Bot]) -> None:
     await ctx.send(help_text)
 
 
-# Run the bot
-if __name__ == "__main__":
+async def main() -> None:
+    await fetch_available_voices()
     # Make sure to set your bot token as an environment variable
     TOKEN: str = os.environ.get("DISCORD_BOT_TOKEN", "")
 
@@ -491,4 +482,9 @@ if __name__ == "__main__":
         print("Please set the DISCORD_BOT_TOKEN environment variable")
         exit(1)
 
-    bot.run(TOKEN)
+    await bot.start(TOKEN)
+
+
+# Run the bot
+if __name__ == "__main__":
+    asyncio.run(main())
