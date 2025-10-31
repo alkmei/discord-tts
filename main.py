@@ -7,6 +7,7 @@ from typing import Dict, Optional, List
 import logging
 import tempfile
 from dotenv import load_dotenv
+import io
 
 from queue import Queue
 
@@ -27,14 +28,14 @@ intents.members = True
 
 bot: commands.Bot = commands.Bot(command_prefix="!", intents=intents)
 
-available_voices: List[str] = []
+available_voices: Dict[str, str] = {}
 
 
 async def fetch_available_voices():
     global available_voices
     voices = await edge_tts.voices.list_voices()
     # If voices are objects, extract their names; adjust as needed
-    available_voices = [v["Name"] if "Name" in v else str(v) for v in voices]
+    available_voices = {v["ShortName"]: v["Name"] for v in voices}
 
 
 class TTSBot:
@@ -87,7 +88,9 @@ class TTSBot:
                 tmp_path: str = tmp_file.name
 
             # Generate speech
-            communicate: edge_tts.Communicate = edge_tts.Communicate(text, voice)
+            communicate: edge_tts.Communicate = edge_tts.Communicate(
+                text, available_voices[voice]
+            )
             await communicate.save(tmp_path)
 
             # Add to simultaneous playback
@@ -370,6 +373,8 @@ async def set_voice(
     ctx: commands.Context[commands.Bot], voice_name: Optional[str] = None
 ) -> None:
     """Set or view your TTS voice"""
+    print(voice_name)
+
     if voice_name is None:
         current_voice: str = tts_bot.get_user_voice(ctx.author.id)
         await ctx.send(f"Your current voice is: {current_voice}")
@@ -380,19 +385,32 @@ async def set_voice(
         tts_bot.save_user_voices()
         await ctx.send(f"Your voice has been set to: {voice_name}")
     else:
-        voices_list: str = "\n".join(available_voices)
-        await ctx.send(f"Invalid voice. Available voices:\n```{voices_list}```")
+        voices_list: str = "\n".join(available_voices.keys())
+        with io.StringIO(voices_list) as file:
+            # Send the file as an attachment
+            await ctx.send(
+                "Voice not found:",
+                file=discord.File(file, "voices.txt"),
+            )
 
 
 @bot.command(name="voices")
 async def list_voices(ctx: commands.Context[commands.Bot]) -> None:
     """List all available TTS voices"""
-    voices_list: str = "\n".join(available_voices)
-    # Send the voices.txt file as an attachment if it exists, otherwise send the list
-    if os.path.exists("./voices.txt"):
-        await ctx.send("Available voices:", file=discord.File("./voices.txt"))
-    else:
-        await ctx.send(f"Available voices:\n```{voices_list}```")
+    if not available_voices:
+        await ctx.send("Voices are still being fetched, please try again in a moment.")
+        return
+
+    # Join the list of voice names into a single string
+    voices_content = "\n".join(available_voices.keys())
+
+    # Create a file-like object in memory
+    with io.StringIO(voices_content) as file:
+        # Send the file as an attachment
+        await ctx.send(
+            "Here is the list of available voices:",
+            file=discord.File(file, "voices.txt"),
+        )
 
 
 @bot.command(name="s")
