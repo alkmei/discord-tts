@@ -1,0 +1,31 @@
+services:
+  redis:
+    image: redis:alpine
+    ports:
+      - "6379:6379"
+
+  bot:
+    build: .
+    volumes:
+      - ./voices:/app/voices
+      - shared_data:/app/shared
+    env_file: .env
+    depends_on:
+      - redis
+    restart: always
+    command: python bot/main.py
+
+  worker:
+    build: .
+    volumes:
+      - ./voices:/app/voices
+      - shared_data:/app/shared
+    env_file: .env
+    depends_on:
+      - redis
+    restart: always
+    # If using a GPU, you'll need additional nvidia-docker config here
+    command: celery -A worker.tasks worker --loglevel=info --concurrency=1
+
+volumes:
+  shared_data:

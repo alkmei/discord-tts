@@ -1,0 +1,20 @@
+[project]
+name = "discord-tts"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "beartype>=0.22.9",
+    "celery>=5.6.2",
+    "celery-types>=0.24.0",
+    "discord-py>=2.6.3",
+    "pocket-tts>=1.1.1",
+    "pynacl>=1.6.0",
+    "python-dotenv>=1.1.1",
+    "redis>=7.1.1",
+    "scipy>=1.17.0",
+]
+
+[dependency-groups]
+dev = []

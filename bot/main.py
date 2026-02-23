@@ -1,0 +1,321 @@
+import discord
+from discord.ext import commands
+from celery import Celery
+import asyncio
+import os
+import uuid
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# --- Configuration ---
+TOKEN = os.getenv("DISCORD_BOT_TOKEN")
+REDIS_URL = os.getenv("REDIS_URL")
+PREFIX = "!"
+VOICES_DIR = "/app/voices"
+SHARED_DIR = "/app/shared"
+
+# --- Setup Celery App ---
+celery_app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
+
+# --- Bot Setup ---
+intents = discord.Intents.default()
+intents.message_content = True
+intents.voice_states = True
+intents.members = True
+
+bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+# --- State ---
+user_voice_selections = {}  # UserID -> Voice Name
+bound_channels = {}  # GuildID -> ChannelID
+guild_queues = {}  # GuildID -> asyncio.Queue (stores TTSRequest references)
+processing_tasks = {}  # GuildID -> Task (the background loop)
+currently_playing = {}  # GuildID -> TTSRequest (the one currently being voiced)
+
+
+# --- Helper: Check Available Voices ---
+def get_available_voices():
+    voices = []
+    if os.path.exists(VOICES_DIR):
+        for filename in os.listdir(VOICES_DIR):
+            name, ext = os.path.splitext(filename)
+            if ext in [".safetensors", ".wav"]:
+                voices.append(name.lower())
+    return voices
+
+
+# --- Queue Logic ---
+
+
+class TTSRequest:
+    """Tracks a Celery task and its associated Discord context."""
+
+    def __init__(self, task, user_name, text, filepath):
+        self.task = task
+        self.user_name = user_name
+        self.text = text
+        self.filepath = filepath
+
+
+async def process_queue(guild_id):
+    """Background loop that waits for Celery tasks to finish and plays them sequentially."""
+    while True:
+        request = await guild_queues[guild_id].get()
+        currently_playing[guild_id] = request
+
+        guild = bot.get_guild(guild_id)
+        vc = guild.voice_client if guild else None
+
+        if not vc:
+            currently_playing[guild_id] = None
+            guild_queues[guild_id].task_done()
+            continue
+
+        try:
+            # 1. Wait for Celery worker to finish this specific task
+            while not request.task.ready():
+                await asyncio.sleep(0.1)
+
+            if request.task.state == "FAILURE":
+                print(f"Celery Task failed: {request.task.result}")
+                currently_playing[guild_id] = None
+                guild_queues[guild_id].task_done()
+                continue
+
+            # 2. Wait for the voice client to finish playing the previous audio
+            while vc.is_playing():
+                await asyncio.sleep(0.1)
+
+            # 3. Play the Audio
+            if os.path.exists(request.filepath):
+                source = discord.FFmpegPCMAudio(request.filepath)
+                play_done = asyncio.Event()
+
+                def after_playing(error):
+                    if os.path.exists(request.filepath):
+                        try:
+                            os.remove(request.filepath)
+                        except:
+                            pass
+                    bot.loop.call_soon_threadsafe(play_done.set)
+                    if error:
+                        print(f"Player error: {error}")
+
+                vc.play(source, after=after_playing)
+                await play_done.wait()
+
+        except Exception as e:
+            print(f"Error during playback: {e}")
+
+        currently_playing[guild_id] = None
+        guild_queues[guild_id].task_done()
+
+
+async def add_to_tts_queue(guild_id, user_name, text, voice_name):
+    """Dispatches directly to Celery's queue and tracks the task locally."""
+    if guild_id not in guild_queues:
+        guild_queues[guild_id] = asyncio.Queue()
+        processing_tasks[guild_id] = asyncio.create_task(process_queue(guild_id))
+
+    task_id = str(uuid.uuid4())
+    filename = f"{task_id}.wav"
+    filepath = os.path.join(SHARED_DIR, filename)
+
+    # Dispatch to Celery IMMEDIATELY. This puts the generation work into Celery's queue.
+    task = celery_app.send_task(
+        "worker.tasks.generate_tts_task",
+        args=[text, voice_name, filename],
+    )
+
+    # Track the request so the bot knows what order to play them in
+    request = TTSRequest(task, user_name, text, filepath)
+    await guild_queues[guild_id].put(request)
+
+
+# --- Events ---
+
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.name}")
+
+
+@bot.event
+async def on_message(message):
+    if message.author.bot:
+        return
+    await bot.process_commands(message)
+    if message.content.startswith(PREFIX):
+        return
+
+    if message.content.startswith("https://") or message.content.startswith("http://"):
+        return
+
+    # Auto-TTS logic
+    if message.guild and message.guild.id in bound_channels:
+        if message.channel.id == bound_channels[message.guild.id]:
+            if message.author.voice and message.author.voice.channel:
+                vc = message.guild.voice_client
+                if vc and vc.channel == message.author.voice.channel:
+                    if message.author.voice.self_mute or message.author.voice.mute:
+                        voice_name = user_voice_selections.get(
+                            message.author.id, "alba"
+                        )
+                        text_to_say = (
+                            f"{message.author.display_name} says: {message.content}"
+                        )
+                        await add_to_tts_queue(
+                            message.guild.id,
+                            message.author.display_name,
+                            text_to_say,
+                            voice_name,
+                        )
+
+
+# --- Commands ---
+
+
+@bot.command()
+async def join(ctx):
+    if not ctx.author.voice:
+        return await ctx.send("You are not in a voice channel.")
+
+    channel = ctx.author.voice.channel
+    if ctx.voice_client:
+        await ctx.voice_client.move_to(channel)
+    else:
+        await channel.connect()
+
+    bound_channels[ctx.guild.id] = ctx.channel.id
+    await ctx.send(f"Joined **{channel.name}** and bound to this text channel.")
+
+
+@bot.command()
+async def queue(ctx):
+    """Displays the items currently waiting in the queue (Plaintext)."""
+    guild_id = ctx.guild.id
+
+    # Get current and queued items
+    current = currently_playing.get(guild_id)
+
+    # Access internal queue list safely
+    if guild_id in guild_queues:
+        queue_list = list(guild_queues[guild_id]._queue)
+    else:
+        queue_list = []
+
+    if not current and not queue_list:
+        return await ctx.send("The queue is currently empty.")
+
+    lines = ["**TTS Queue**"]
+
+    # 1. Currently Playing section
+    if current:
+        status = "🔊 Playing" if current.task.ready() else "⚙️ Generating"
+        # Truncate text to 50 chars to prevent hitting message limits
+        text_preview = (
+            current.text[:50] + "..." if len(current.text) > 50 else current.text
+        )
+        lines.append(f"__Now:__ **{current.user_name}** ({status}): {text_preview}")
+
+    # 2. Up Next section
+    if queue_list:
+        lines.append("\n__Up Next:__")
+        for i, req in enumerate(queue_list[:10], 1):  # Show max 10 items
+            status = "Ready" if req.task.ready() else "Queued"
+            text_preview = req.text[:50] + "..." if len(req.text) > 50 else req.text
+            lines.append(f"{i}. **{req.user_name}** [{status}]: {text_preview}")
+
+        if len(queue_list) > 10:
+            lines.append(f"...and {len(queue_list) - 10} more.")
+    else:
+        if current:
+            lines.append("\n(No other items pending)")
+
+    # Send as a standard message
+    await ctx.send("\n".join(lines))
+
+
+@bot.command()
+async def t(ctx, *, text: str):
+    if not ctx.voice_client:
+        return await ctx.send("Use `!join` first.")
+
+    voice_name = user_voice_selections.get(ctx.author.id, "alba")
+    text_to_say = f"{ctx.author.display_name} says: {text}"
+    await add_to_tts_queue(
+        ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
+    )
+
+
+@bot.command()
+async def s(ctx, *, text: str):
+    if not ctx.voice_client:
+        return await ctx.send("Use `!join` first.")
+
+    voice_name = user_voice_selections.get(ctx.author.id, "alba")
+    await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text, voice_name)
+
+
+@bot.command()
+async def multi(ctx, *, text: str):
+    if not ctx.voice_client:
+        return await ctx.send("Use `!join` first.")
+
+    # For each line, if it starts with valid_voice:, use that voice for the line
+    lines = text.splitlines()
+    for line in lines:
+        if ":" in line:
+            potential_voice, actual_text = line.split(":", 1)
+            potential_voice = potential_voice.strip().lower()
+            if potential_voice in get_available_voices():
+                voice_name = potential_voice
+                text_to_say = f"{actual_text.strip()}"
+                await add_to_tts_queue(
+                    ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
+                )
+                continue
+
+        # If no valid voice prefix, use default
+        voice_name = user_voice_selections.get(ctx.author.id, "alba")
+        text_to_say = f"{line.strip()}"
+        await add_to_tts_queue(
+            ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
+        )
+
+
+@bot.command()
+async def stop(ctx):
+    if ctx.voice_client:
+        ctx.voice_client.stop()
+
+        # Clear the local queue AND cancel the pending tasks in Celery!
+        if ctx.guild.id in guild_queues:
+            while not guild_queues[ctx.guild.id].empty():
+                try:
+                    req = guild_queues[ctx.guild.id].get_nowait()
+                    # Tell Celery to kill the task if it hasn't started or is running
+                    celery_app.control.revoke(req.task.id, terminate=True)
+                    guild_queues[ctx.guild.id].task_done()
+                except asyncio.QueueEmpty:
+                    break
+
+    await ctx.send("Stopped playback and cancelled pending tasks.")
+
+
+@bot.command()
+async def voice(ctx, name: str):
+    available = get_available_voices()
+    name = name.lower()
+    if name not in available:
+        return await ctx.send(
+            f"❌ Voice `{name}` not found. Available: {', '.join(available)}"
+        )
+
+    user_voice_selections[ctx.author.id] = name
+    await ctx.send(f"✅ Voice set to **{name}**")
+
+
+if __name__ == "__main__":
+    bot.run(TOKEN)
