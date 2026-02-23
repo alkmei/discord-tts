@@ -1,11 +1,10 @@
 # discord-tts
 
-A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, high-quality speech generation. Built with Python for cross-platform compatibility; note, the included voice export script is Bash and compatible with Linux/macOS only.
+A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, high-quality speech generation. Built with Python for cross-platform compatibility.
 
 ## Features
 
-- Custom voice support via `.safetensors` models (recommended for maximum speed)
-- Optional `.wav` voice format (slower)
+- Primarily needs `.safetensors` models generated from Pocket-TTS
 - Automatic TTS for muted users
 - Primary commands: `!voice`, `!s`, `!t`
 
@@ -16,8 +15,7 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
   1. Collecting audio samples (`wav`, `mp3`, `flac`, `m4a`, `ogg`, `opus`)
   2. Using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) and the `export-voices.sh` script to convert/truncate/export
   3. Placing `.safetensors` files in the `voices` directory
-- `.wav` files may be used but are slower; `.safetensors` is strongly recommended.
-- No voice listing command yet; inspect the `voices` folder manually.
+- `.wav` files may be used (no idea if this works) but are slower; `.safetensors` is strongly recommended.
 
 ## Training & Exporting Voices
 
@@ -34,6 +32,8 @@ Use the `export-voices.sh` script to convert supported audio formats to truncate
   ./export-voices.sh ./samples ./voices
   ```
 
+The `export_voices.py` script should do the same thing, and is platform independent.
+
 See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for full training details.
 
 ## Dependency & Environment Setup (Summarized)
@@ -49,6 +49,10 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
 
 ## Bot Commands
 
+- `!join`
+  - Joins the voice channel the caller is in.
+  - Listens for messages from muted users in VC in the channel this command was called in.
+  - Recommend you use this command in a VC adjacent text channel (no idea if the text channels embedded in a VC work)
 - `!voice <voice_name>`
   - Set your TTS voice
   - Example: `!voice Joe`
@@ -56,8 +60,19 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
   - Speak text directly (no username prefix)
   - Example: `!s Hello world!`
 - `!t <text>`
-  - Speak text with your username prefix
+  - Speak text with your username prefix (`<username> says: <text>`)
   - Example: `!t Testing 1 2 3`
+- `!multi`
+  - Used for playing dialog from different voices back to back. Example:
+
+```
+!multi
+alba: Hello everyone! How are you doing?
+marius: I'm doing good!
+```
+
+> Depends on having `alba.safetensors` and `marius.safetensors` inside the `voices` directory.
+
 - **Automatic TTS:** Muted user’s text messages are spoken aloud in voice channels.
 
 ## Running the Bot
@@ -73,13 +88,6 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
 - [ffmpeg install guides](https://ffmpeg.org/download.html)
 - [Discord developer portal](https://discord.com/developers/applications)
 - [uv documentation](https://github.com/astral-sh/uv)
-
-## Limitations & Troubleshooting
-
-- `.wav` models are supported but not recommended (slow)
-- No command to list voices yet
-- Bash script not supported on Windows
-- Common issues: missing dependencies, folder structure, Discord bot permissions
 
 ## Contributing
 
