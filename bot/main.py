@@ -317,5 +317,13 @@ async def voice(ctx, name: str):
     await ctx.send(f"✅ Voice set to **{name}**")
 
 
+@bot.command()
+async def voices(ctx):
+    available = get_available_voices()
+    if not available:
+        return await ctx.send("No voices available.")
+    await ctx.send(f"**Available Voices:** \n```\n{'\n'.join(available)}\n```")
+
+
 if __name__ == "__main__":
     bot.run(TOKEN)
