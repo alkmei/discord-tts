@@ -1,2 +1,6 @@
-.venv
 voices
+.git
+.github
+.venv
+__pycache__
+*.pyc
