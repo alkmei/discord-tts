@@ -1,42 +1,39 @@
-# -- STAGE 1: Builder --
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
+# Use a Python 3.13 image with uv pre-installed
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
 
-# Enable bytecode compilation
-ENV UV_COMPILE_BYTECODE=1 UV_LINK_MODE=copy
-
-WORKDIR /app
-
-# Install build-only dependencies
+# Install system dependencies
+# - ffmpeg: Required by discord.py to play audio
+# - build-essential/libffi-dev: Required to compile PyNaCl and other C extensions
+# - git: Required to install pocket-tts from the git source
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
     build-essential \
     libffi-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies using a cache mount for uv
-RUN --mount=type=cache,target=/root/.cache/uv \
-    --mount=type=bind,source=uv.lock,target=uv.lock \
-    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
-    uv sync --frozen --no-install-project --no-dev
-
-# -- STAGE 2: Runtime --
-FROM python:3.13-slim-bookworm
-
+# Set the working directory
 WORKDIR /app
 
-# Install ONLY runtime dependencies (ffmpeg)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
-    && rm -rf /var/lib/apt/lists/*
+# Enable bytecode compilation for faster startups
+ENV UV_COMPILE_BYTECODE=1
 
-# Copy the virtualenv from the builder
-COPY --from=builder /app/.venv /app/.venv
+# Copy dependency files first for better layer caching
+COPY pyproject.toml uv.lock ./
 
-# Copy your application code
+# Install dependencies using uv
+# --frozen ensures we use the exact versions in the lockfile
+RUN uv sync --frozen --no-install-project --no-dev
+
+# Copy the rest of the application code
 COPY . .
 
-# Environment setup
+# Create directories for voices and shared audio files
+RUN mkdir -p /app/voices /app/shared
+
+# Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
+# Default command (can be overridden in docker-compose)
 CMD ["python", "bot/main.py"]
