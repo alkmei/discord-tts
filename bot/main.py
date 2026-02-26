@@ -1,46 +1,70 @@
-import json
+"""Discord TTS Bot - Main bot module for text-to-speech in voice channels."""
 
-import discord
-from discord.ext import commands
-from celery import Celery
+from __future__ import annotations
+
 import asyncio
-import os
+import contextlib
+import json
+import logging
 import uuid
-from dotenv import load_dotenv
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from celery.result import AsyncResult
+    from discord.ext.commands import Context  # type: ignore[import]
+
 import aio_pika
+import discord
+from celery import Celery
+from discord.ext import commands
+from dotenv import load_dotenv
 
 load_dotenv()
 
+import os
+
 # --- Configuration ---
-TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-RABBITMQ_URL = os.getenv("RABBITMQ_URL")
-PREFIX = "!"
-VOICES_DIR = "/app/voices"
-SHARED_DIR = "/app/shared"
+TOKEN: str = os.getenv("DISCORD_BOT_TOKEN", "")
+RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "")
+PREFIX: str = "!"
+VOICES_DIR: Path = Path("/app/voices")
+SHARED_DIR: Path = Path("/app/shared")
 
-celery_app = Celery("tts_worker", broker=RABBITMQ_URL, backend="rpc://")
+# Constants for queue display
+TEXT_PREVIEW_LENGTH: int = 50
+MAX_QUEUE_DISPLAY: int = 10
 
-intents = discord.Intents.default()
+celery_app: Celery = Celery("tts_worker", broker=RABBITMQ_URL, backend="rpc://")
+
+intents: discord.Intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
 intents.members = True
 
-bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+bot: commands.Bot = commands.Bot(command_prefix=PREFIX, intents=intents)
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # --- State ---
-user_voice_selections = {}  # UserID -> Voice Name
-bound_channels = {}  # GuildID -> ChannelID
-guild_queues = {}  # GuildID -> asyncio.Queue (stores TTSRequest references)
-processing_tasks = {}  # GuildID -> Task (the background loop)
-currently_playing = {}  # GuildID -> TTSRequest (the one currently being voiced)
+user_voice_selections: dict[int, str] = {}  # UserID -> Voice Name
+bound_channels: dict[int, int] = {}  # GuildID -> ChannelID
+guild_queues: dict[int, asyncio.Queue[TTSRequest]] = {}  # GuildID -> asyncio.Queue
+processing_tasks: dict[int, asyncio.Task[None]] = {}  # GuildID -> Task
+currently_playing: dict[int, TTSRequest | None] = {}  # GuildID -> TTSRequest
 
 
-# --- Helper: Check Available Voices ---
-def get_available_voices():
-    voices = []
-    if os.path.exists(VOICES_DIR):
-        for filename in os.listdir(VOICES_DIR):
-            name, ext = os.path.splitext(filename)
+def get_available_voices() -> list[str]:
+    """Returns list of available voice names from voices directory."""
+    voices: list[str] = []
+    if VOICES_DIR.exists():
+        for filepath in VOICES_DIR.iterdir():
+            ext: str = filepath.suffix
+            name: str = filepath.stem
             if ext in [".safetensors", ".wav"]:
                 voices.append(name.lower())
     return voices
@@ -52,21 +76,76 @@ def get_available_voices():
 class TTSRequest:
     """Tracks a Celery task and its associated Discord context."""
 
-    def __init__(self, task, user_name, text, filepath):
+    task: AsyncResult[Any]
+    user_name: str
+    text: str
+    filepath: Path
+
+    def __init__(self, task: AsyncResult[Any], user_name: str, text: str, filepath: Path) -> None:
         self.task = task
         self.user_name = user_name
         self.text = text
         self.filepath = filepath
 
 
-async def process_queue(guild_id):
+async def wait_for_task_completion(task: AsyncResult[Any]) -> None:
+    """Wait for a Celery task to complete using asyncio.Event polling."""
+    completion_event: asyncio.Event = asyncio.Event()
+
+    async def poll_task() -> None:
+        while not task.ready():  # noqa: ASYNC110
+            await asyncio.sleep(0.1)
+        completion_event.set()
+
+    poll_task_instance: asyncio.Task[None] = asyncio.create_task(poll_task())
+    await completion_event.wait()
+    poll_task_instance.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await poll_task_instance
+
+
+async def wait_for_playback_completion(vc: discord.VoiceClient) -> None:
+    """Wait for voice client playback to complete using asyncio.Event polling."""
+    completion_event: asyncio.Event = asyncio.Event()
+
+    async def poll_playback() -> None:
+        while vc.is_playing():  # noqa: ASYNC110
+            await asyncio.sleep(0.1)
+        completion_event.set()
+
+    poll_task: asyncio.Task[None] = asyncio.create_task(poll_playback())
+    await completion_event.wait()
+    poll_task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await poll_task
+
+
+def create_after_playing_callback(
+    request_filepath: Path,
+    play_done_event: asyncio.Event,
+    event_loop: asyncio.AbstractEventLoop,
+) -> Callable[[BaseException | None], None]:
+    """Create a callback function for after audio playback completes."""
+
+    def after_playing(error: BaseException | None) -> None:
+        if request_filepath.exists():
+            with contextlib.suppress(OSError):
+                request_filepath.unlink()
+        event_loop.call_soon_threadsafe(play_done_event.set)
+        if error:
+            logger.error("Player error: %s", error)
+
+    return after_playing
+
+
+async def process_queue(guild_id: int) -> None:
     """Background loop that waits for Celery tasks to finish and plays them sequentially."""
     while True:
-        request = await guild_queues[guild_id].get()
+        request: TTSRequest = await guild_queues[guild_id].get()
         currently_playing[guild_id] = request
 
-        guild = bot.get_guild(guild_id)
-        vc = guild.voice_client if guild else None
+        guild: discord.Guild | None = bot.get_guild(guild_id)
+        vc: discord.VoiceClient | None = guild.voice_client if guild else None  # type: ignore[assignment]
 
         if not vc:
             currently_playing[guild_id] = None
@@ -74,127 +153,124 @@ async def process_queue(guild_id):
             continue
 
         try:
-            while not request.task.ready():
-                await asyncio.sleep(0.1)
+            await wait_for_task_completion(request.task)
 
             if request.task.state == "FAILURE":
-                print(f"Celery Task failed: {request.task.result}")
+                logger.warning("Celery Task failed: %s", request.task.result)
                 currently_playing[guild_id] = None
                 guild_queues[guild_id].task_done()
                 continue
 
-            while vc.is_playing():
-                await asyncio.sleep(0.1)
+            await wait_for_playback_completion(vc)
 
-            if os.path.exists(request.filepath):
-                source = discord.FFmpegPCMAudio(request.filepath)
-                play_done = asyncio.Event()
+            if request.filepath.exists():
+                source: discord.FFmpegPCMAudio = discord.FFmpegPCMAudio(str(request.filepath))
+                play_done: asyncio.Event = asyncio.Event()
 
-                def after_playing(error):
-                    if os.path.exists(request.filepath):
-                        try:
-                            os.remove(request.filepath)
-                        except:
-                            pass
-                    bot.loop.call_soon_threadsafe(play_done.set)
-                    if error:
-                        print(f"Player error: {error}")
+                after_callback: Callable[[BaseException | None], None] = create_after_playing_callback(
+                    request.filepath,
+                    play_done,
+                    bot.loop,
+                )
 
-                vc.play(source, after=after_playing)
+                vc.play(source, after=after_callback)
                 await play_done.wait()
 
-        except Exception as e:
-            print(f"Error during playback: {e}")
+        except asyncio.CancelledError:
+            logger.info("Queue processing cancelled for guild %d", guild_id)
+            raise
 
         currently_playing[guild_id] = None
         guild_queues[guild_id].task_done()
 
 
-async def add_to_tts_queue(guild_id, user_name, text, voice_name):
+async def add_to_tts_queue(guild_id: int, user_name: str, text: str, voice_name: str) -> None:
     """Dispatches directly to Celery's queue and tracks the task locally."""
     if guild_id not in guild_queues:
         guild_queues[guild_id] = asyncio.Queue()
         processing_tasks[guild_id] = asyncio.create_task(process_queue(guild_id))
 
-    task_id = str(uuid.uuid4())
-    filename = f"{task_id}.wav"
-    filepath = os.path.join(SHARED_DIR, filename)
+    task_id: str = str(uuid.uuid4())
+    filename: str = f"{task_id}.wav"
+    filepath: Path = SHARED_DIR / filename
 
     # Dispatch to Celery IMMEDIATELY. This puts the generation work into Celery's queue.
-    task = celery_app.send_task(
+    task: AsyncResult[Any] = celery_app.send_task(
         "worker.tasks.generate_tts_task",
         args=[text, voice_name, filename],
     )
 
     # Track the request so the bot knows what order to play them in
-    request = TTSRequest(task, user_name, text, filepath)
+    request: TTSRequest = TTSRequest(task, user_name, text, filepath)
     await guild_queues[guild_id].put(request)
 
 
-async def listen_for_web_requests():
+async def listen_for_web_requests() -> None:
     """Background task to receive TTS requests from the Web UI via RabbitMQ."""
-    connection = await aio_pika.connect_robust(RABBITMQ_URL)
-    channel = await connection.channel()
+    connection: aio_pika.abc.AbstractRobustConnection = await aio_pika.connect_robust(RABBITMQ_URL)
+    channel: aio_pika.abc.AbstractChannel = await connection.channel()
 
     # Declare exchange and queue for web TTS requests
-    exchange = await channel.declare_exchange(
+    exchange: aio_pika.abc.AbstractExchange = await channel.declare_exchange(
         "web_tts_requests", aio_pika.ExchangeType.FANOUT, durable=True
     )
-    queue = await channel.declare_queue("", exclusive=True)
-    await queue.bind(exchange)
+    rabbitmq_queue: aio_pika.abc.AbstractQueue = await channel.declare_queue("", exclusive=True)
+    await rabbitmq_queue.bind(exchange)
 
-    async for message in queue:
-        try:
-            async with message.process():
-                data = json.loads(message.body.decode())
-                guild_id = data["guild_id"]
+    async with rabbitmq_queue.iterator() as queue_iter:
+        async for message in queue_iter:
+            try:
+                async with message.process():
+                    data: dict[str, str | int] = json.loads(message.body.decode())
+                    guild_id: int = int(data["guild_id"])
 
-                # Find the guild and check if bot is in a voice channel there
-                guild = bot.get_guild(guild_id)
-                if not guild:
-                    print(f"❌ Web request ignored: Guild {guild_id} not found.")
-                    continue
+                    # Find the guild and check if bot is in a voice channel there
+                    guild: discord.Guild | None = bot.get_guild(guild_id)
+                    if not guild:
+                        logger.warning("Web request ignored: Guild %d not found.", guild_id)
+                        continue
 
-                vc = guild.voice_client
-                if not vc:
-                    print(
-                        f"❌ Web request ignored: Not in a voice channel in {guild.name}."
-                    )
-                    continue
+                    vc: discord.VoiceClient | None = guild.voice_client  # type: ignore[assignment]
+                    if not vc:
+                        logger.warning("Web request ignored: Not in a voice channel in %s.", guild.name)
+                        continue
 
-                # Add to queue
-                task_id = data["task_id"]
-                filename = f"web_{task_id}.wav"
-                filepath = os.path.join(SHARED_DIR, filename)
+                    # Add to queue
+                    task_id: str = str(data["task_id"])
+                    filename: str = f"web_{task_id}.wav"
+                    filepath: Path = SHARED_DIR / filename
 
-                request = TTSRequest(
-                    task=celery_app.AsyncResult(task_id),
-                    user_name=data["user_name"],
-                    text=data["text"],
-                    filepath=filepath,
-                )
-
-                if guild_id not in guild_queues:
-                    guild_queues[guild_id] = asyncio.Queue()
-                    processing_tasks[guild_id] = asyncio.create_task(
-                        process_queue(guild_id)
+                    request: TTSRequest = TTSRequest(
+                        task=celery_app.AsyncResult(task_id),
+                        user_name=str(data["user_name"]),
+                        text=str(data["text"]),
+                        filepath=filepath,
                     )
 
-                await guild_queues[guild_id].put(request)
+                    if guild_id not in guild_queues:
+                        guild_queues[guild_id] = asyncio.Queue()
+                        processing_tasks[guild_id] = asyncio.create_task(process_queue(guild_id))
 
-        except Exception as e:
-            print(f"Web Listener Error: {e}")
+                    await guild_queues[guild_id].put(request)
+
+            except json.JSONDecodeError:
+                logger.exception("Web Listener JSON Error")
+            except KeyError:
+                logger.exception("Web Listener missing key")
 
 
 # --- Events ---
 @bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user.name}")
+async def on_ready() -> None:
+    """Called when the bot is ready and connected to Discord."""
+    if bot.user:
+        logger.info("Logged in as %s", bot.user.name)
     bot.loop.create_task(listen_for_web_requests())
 
 
 @bot.event
-async def on_message(message):
+async def on_message(message: discord.Message) -> None:
+    """Process incoming messages for commands and auto-TTS."""
     if message.author.bot:
         return
     await bot.process_commands(message)
@@ -205,148 +281,167 @@ async def on_message(message):
         return
 
     # Auto-TTS logic
-    if message.guild and message.guild.id in bound_channels:
-        if message.channel.id == bound_channels[message.guild.id]:
-            if message.author.voice and message.author.voice.channel:
-                vc = message.guild.voice_client
-                if vc and vc.channel == message.author.voice.channel:
-                    if message.author.voice.self_mute or message.author.voice.mute:
-                        voice_name = user_voice_selections.get(
-                            message.author.id, "alba"
-                        )
-                        text_to_say = (
-                            f"{message.author.display_name} says: {message.content}"
-                        )
-                        await add_to_tts_queue(
-                            message.guild.id,
-                            message.author.display_name,
-                            text_to_say,
-                            voice_name,
-                        )
+    if (
+        message.guild
+        and message.guild.id in bound_channels
+        and message.channel.id == bound_channels[message.guild.id]
+        and message.author.voice  # type: ignore[union-attr]
+        and message.author.voice.channel  # type: ignore[union-attr]
+    ):
+        vc: discord.VoiceClient | None = message.guild.voice_client  # type: ignore[assignment]
+        author_voice: discord.VoiceState = message.author.voice  # type: ignore[union-attr, assignment]
+        if vc and vc.channel == author_voice.channel and (author_voice.self_mute or author_voice.mute):
+            voice_name: str = user_voice_selections.get(message.author.id, "alba")
+            text_to_say: str = f"{message.author.display_name} says: {message.content}"
+            await add_to_tts_queue(
+                message.guild.id,
+                message.author.display_name,
+                text_to_say,
+                voice_name,
+            )
 
 
 # --- Commands ---
 
 
 @bot.command()
-async def join(ctx):
-    if not ctx.author.voice:
-        return await ctx.send("You are not in a voice channel.")
+async def join(ctx: Context[commands.Bot]) -> None:
+    """Join the voice channel of the command invoker."""
+    if not ctx.author.voice:  # type: ignore[union-attr]
+        await ctx.send("You are not in a voice channel.")
+        return
 
-    channel = ctx.author.voice.channel
+    channel: discord.VoiceChannel = ctx.author.voice.channel  # type: ignore[union-attr, assignment]
     if ctx.voice_client:
-        await ctx.voice_client.move_to(channel)
+        await ctx.voice_client.move_to(channel)  # type: ignore[union-attr]
     else:
         await channel.connect()
 
-    bound_channels[ctx.guild.id] = ctx.channel.id
+    if ctx.guild:
+        bound_channels[ctx.guild.id] = ctx.channel.id  # type: ignore[union-attr]
     await ctx.send(f"Joined **{channel.name}** and bound to this text channel.")
 
 
 @bot.command()
-async def queue(ctx):
+async def queue(ctx: Context[commands.Bot]) -> None:
     """Displays the items currently waiting in the queue (Plaintext)."""
-    guild_id = ctx.guild.id
+    if not ctx.guild:
+        await ctx.send("This command must be used in a server.")
+        return
+
+    guild_id: int = ctx.guild.id
 
     # Get current and queued items
-    current = currently_playing.get(guild_id)
+    current: TTSRequest | None = currently_playing.get(guild_id)
 
     # Access internal queue list safely
-    if guild_id in guild_queues:
-        queue_list = list(guild_queues[guild_id]._queue)
-    else:
-        queue_list = []
+    queue_list: list[TTSRequest] = (
+        list(guild_queues[guild_id]._queue) if guild_id in guild_queues else []  # type: ignore[attr-defined] # noqa: SLF001
+    )
 
     if not current and not queue_list:
-        return await ctx.send("The queue is currently empty.")
+        await ctx.send("The queue is currently empty.")
+        return
 
-    lines = ["**TTS Queue**"]
+    lines: list[str] = ["**TTS Queue**"]
 
     # 1. Currently Playing section
     if current:
-        status = "🔊 Playing" if current.task.ready() else "⚙️ Generating"
-        # Truncate text to 50 chars to prevent hitting message limits
-        text_preview = (
-            current.text[:50] + "..." if len(current.text) > 50 else current.text
+        status: str = "Playing" if current.task.ready() else "Generating"
+        # Truncate text to TEXT_PREVIEW_LENGTH chars to prevent hitting message limits
+        text_preview: str = (
+            current.text[:TEXT_PREVIEW_LENGTH] + "..." if len(current.text) > TEXT_PREVIEW_LENGTH else current.text
         )
         lines.append(f"__Now:__ **{current.user_name}** ({status}): {text_preview}")
 
     # 2. Up Next section
     if queue_list:
         lines.append("\n__Up Next:__")
-        for i, req in enumerate(queue_list[:10], 1):  # Show max 10 items
+        for i, req in enumerate(queue_list[:MAX_QUEUE_DISPLAY], 1):
             status = "Ready" if req.task.ready() else "Queued"
-            text_preview = req.text[:50] + "..." if len(req.text) > 50 else req.text
+            text_preview = req.text[:TEXT_PREVIEW_LENGTH] + "..." if len(req.text) > TEXT_PREVIEW_LENGTH else req.text
             lines.append(f"{i}. **{req.user_name}** [{status}]: {text_preview}")
 
-        if len(queue_list) > 10:
-            lines.append(f"...and {len(queue_list) - 10} more.")
-    else:
-        if current:
-            lines.append("\n(No other items pending)")
+        if len(queue_list) > MAX_QUEUE_DISPLAY:
+            lines.append(f"...and {len(queue_list) - MAX_QUEUE_DISPLAY} more.")
+    elif current:
+        lines.append("\n(No other items pending)")
 
     # Send as a standard message
     await ctx.send("\n".join(lines))
 
 
 @bot.command()
-async def t(ctx, *, text: str):
+async def t(ctx: Context[commands.Bot], *, text: str) -> None:
+    """Say text with username prefix."""
     if not ctx.voice_client:
-        return await ctx.send("Use `!join` first.")
+        await ctx.send("Use `!join` first.")
+        return
 
-    voice_name = user_voice_selections.get(ctx.author.id, "alba")
-    text_to_say = f"{ctx.author.display_name} says: {text}"
-    await add_to_tts_queue(
-        ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
-    )
+    if not ctx.guild:
+        await ctx.send("This command must be used in a server.")
+        return
+
+    voice_name: str = user_voice_selections.get(ctx.author.id, "alba")
+    text_to_say: str = f"{ctx.author.display_name} says: {text}"
+    await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text_to_say, voice_name)
 
 
 @bot.command()
-async def s(ctx, *, text: str):
+async def s(ctx: Context[commands.Bot], *, text: str) -> None:
+    """Say text without username prefix."""
     if not ctx.voice_client:
-        return await ctx.send("Use `!join` first.")
+        await ctx.send("Use `!join` first.")
+        return
 
-    voice_name = user_voice_selections.get(ctx.author.id, "alba")
+    if not ctx.guild:
+        await ctx.send("This command must be used in a server.")
+        return
+
+    voice_name: str = user_voice_selections.get(ctx.author.id, "alba")
     await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text, voice_name)
 
 
 @bot.command()
-async def multi(ctx, *, text: str):
+async def multi(ctx: Context[commands.Bot], *, text: str) -> None:
+    """Say multiple lines with optional voice prefixes."""
     if not ctx.voice_client:
-        return await ctx.send("Use `!join` first.")
+        await ctx.send("Use `!join` first.")
+        return
+
+    if not ctx.guild:
+        await ctx.send("This command must be used in a server.")
+        return
 
     # For each line, if it starts with valid_voice:, use that voice for the line
-    lines = text.splitlines()
+    lines: list[str] = text.splitlines()
     for line in lines:
         if ":" in line:
             potential_voice, actual_text = line.split(":", 1)
             potential_voice = potential_voice.strip().lower()
             if potential_voice in get_available_voices():
-                voice_name = potential_voice
-                text_to_say = f"{actual_text.strip()}"
-                await add_to_tts_queue(
-                    ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
-                )
+                voice_name: str = potential_voice
+                text_to_say: str = actual_text.strip()
+                await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text_to_say, voice_name)
                 continue
 
         # If no valid voice prefix, use default
         voice_name = user_voice_selections.get(ctx.author.id, "alba")
-        text_to_say = f"{line.strip()}"
-        await add_to_tts_queue(
-            ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
-        )
+        text_to_say = line.strip()
+        await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text_to_say, voice_name)
 
 
 @bot.command()
-async def stop(ctx):
+async def stop(ctx: Context[commands.Bot]) -> None:
+    """Stop playback and clear the queue."""
     if ctx.voice_client:
-        ctx.voice_client.stop()
+        ctx.voice_client.stop()  # type: ignore[union-attr]
 
         # Clear the local queue AND cancel the pending tasks in Celery!
-        if ctx.guild.id in guild_queues:
+        if ctx.guild and ctx.guild.id in guild_queues:
             while not guild_queues[ctx.guild.id].empty():
                 try:
-                    req = guild_queues[ctx.guild.id].get_nowait()
+                    req: TTSRequest = guild_queues[ctx.guild.id].get_nowait()
                     # Tell Celery to kill the task if it hasn't started or is running
                     celery_app.control.revoke(req.task.id, terminate=True)
                     guild_queues[ctx.guild.id].task_done()
@@ -357,24 +452,27 @@ async def stop(ctx):
 
 
 @bot.command()
-async def voice(ctx, name: str):
-    available = get_available_voices()
+async def voice(ctx: Context[commands.Bot], name: str) -> None:
+    """Set your TTS voice."""
+    available: list[str] = get_available_voices()
     name = name.lower()
     if name not in available:
-        return await ctx.send(
-            f"❌ Voice `{name}` not found. Available: {', '.join(available)}"
-        )
+        await ctx.send(f"Voice `{name}` not found. Available: {', '.join(available)}")
+        return
 
     user_voice_selections[ctx.author.id] = name
-    await ctx.send(f"✅ Voice set to **{name}**")
+    await ctx.send(f"Voice set to **{name}**")
 
 
 @bot.command()
-async def voices(ctx):
-    available = get_available_voices()
+async def voices(ctx: Context[commands.Bot]) -> None:
+    """List available voices."""
+    available: list[str] = get_available_voices()
     if not available:
-        return await ctx.send("No voices available.")
-    await ctx.send(f"**Available Voices:** \n```\n{'\n'.join(available)}\n```")
+        await ctx.send("No voices available.")
+        return
+    voice_list: str = "\n".join(available)
+    await ctx.send(f"**Available Voices:** \n```\n{voice_list}\n```")
 
 
 if __name__ == "__main__":
