@@ -1,0 +1,37 @@
+<div class="card border-0 bg-light shadow-sm mb-3">
+    <div class="card-body">
+        <h6 class="text-primary mb-3 fw-bold">✅ Queued {{ parsed_lines|length }} line(s)</h6>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width:50px">#</th>
+                        <th style="width:100px">Voice</th>
+                        <th>Message</th>
+                        <th style="width:50px"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in parsed_lines %}
+                    <tr>
+                        <td class="text-muted small">{{ line.line_num }}</td>
+                        <td><span class="voice-badge">{{ line.voice }}</span></td>
+                        <td class="line-preview">
+                            {{ line.text }}
+                            {% for warning in line.warnings %}
+                            <br><small class="text-danger">⚠️ {{ warning }}</small>
+                            {% endfor %}
+                        </td>
+                        <td>{% if line.warnings %}⚠️{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% if guild_id %}
+        <p class="small text-muted mb-0 mt-2 italic">Sent to Server ID: <code>{{ guild_id }}</code></p>
+        {% else %}
+        <p class="small text-danger mb-0 mt-2 fw-bold">⚠️ Not sent to Discord (Missing Guild ID)</p>
+        {% endif %}
+    </div>
+</div>

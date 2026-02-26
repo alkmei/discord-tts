@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTS Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.6"></script>
+    <style>
+        body { background-color: #f8f9fa; color: #333; font-family: 'Inter', sans-serif; }
+        .navbar { background-color: #ffffff; border-bottom: 1px solid #dee2e6; }
+        .card { border: none; border-radius: 12px; box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075); }
+        .editor-container { height: 500px; border: 1px solid #ced4da; border-radius: 8px; overflow: hidden; }
+        #editor { width: 100%; height: 100%; }
+        .voice-badge { display: inline-block; padding: 0.25em 0.6em; font-size: 0.75em; font-weight: 700; border-radius: 0.375rem; background-color: #e7f1ff; color: #0d6efd; margin: 2px; }
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: block; }
+        pre { background: #f1f3f5; padding: 1rem; border-radius: 8px; font-size: 0.85rem; }
+        .line-preview { font-family: 'SFMono-Regular', Consolas, monospace; font-size: 0.85rem; }
+    </style>
+</head>
+<body>
+    <nav class="navbar mb-4">
+        <div class="container">
+            <span class="navbar-brand mb-0 h1 text-primary">Discord TTS Dashboard</span>
+        </div>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

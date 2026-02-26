@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card p-4 h-100">
+            <h5 class="fw-bold mb-3">📘 Instructions</h5>
+            <p class="text-muted small">Prefix lines to change voices.</p>
+            <pre><code>alba: Hello!
+alice: Hi there!</code></pre>
+            <label class="small fw-bold text-uppercase text-muted mt-3">Available Voices</label>
+            <div id="available-voices" class="mt-2">
+                <div class="spinner-border spinner-border-sm text-primary"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        <div class="card p-4">
+            <form hx-post="/generate" hx-target="#result-area" hx-indicator="#spinner">
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Discord Server ID</label>
+                    <input type="text" name="guild_id" class="form-control" placeholder="Paste Guild ID">
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-semibold">Script Editor</label>
+                    <div class="editor-container">
+                        <div id="editor"></div>
+                    </div>
+                    <textarea name="text" id="hidden-text" style="display:none;"></textarea>
+                </div>
+
+                <div class="d-flex align-items-center justify-content-between">
+                    <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm" onclick="syncEditorContent()">
+                        Broadcast to Discord
+                    </button>
+                    <div id="spinner" class="htmx-indicator">
+                        <div class="d-flex align-items-center text-primary">
+                            <div class="spinner-border spinner-border-sm me-2"></div>
+                            <span class="small fw-bold">Processing...</span>
+                        </div>
+                    </div>
+                </div>
+            </form>
+            <div id="result-area" class="mt-4"></div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let editor;
+    fetch('/voices').then(r => r.json()).then(voices => {
+        document.getElementById('available-voices').innerHTML = voices.map(v => `<span class="voice-badge">${v}</span>`).join('');
+        initMonaco(voices);
+    });
+
+    function initMonaco(availableVoices) {
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+        require(['vs/editor/editor.main'], function() {
+            monaco.languages.register({ id: 'tts-multi' });
+            monaco.languages.setMonarchTokensProvider('tts-multi', {
+                voices: availableVoices,
+                tokenizer: {
+                    root: [
+                        [/^([a-zA-Z_]+)(:)/, {
+                            cases: { '$1@voices': ['voice.valid', 'delimiter'], '@default': ['voice.invalid', 'delimiter'] }
+                        }],
+                        [/.*$/, 'message']
+                    ]
+                }
+            });
+            monaco.editor.defineTheme('tts-light', {
+                base: 'vs',
+                inherit: true,
+                rules: [
+                    { token: 'voice.valid', foreground: '0d6efd', fontStyle: 'bold' },
+                    { token: 'voice.invalid', foreground: 'dc3545', fontStyle: 'bold' },
+                    { token: 'message', foreground: '198754' }
+                ],
+                colors: { 'editor.background': '#ffffff' }
+            });
+            editor = monaco.editor.create(document.getElementById('editor'), {
+                value: 'alba: Hello!',
+                language: 'tts-multi',
+                theme: 'tts-light',
+                automaticLayout: true,
+                minimap: { enabled: false },
+                wordWrap: 'on'
+            });
+        });
+    }
+
+    function syncEditorContent() {
+        if (editor) document.getElementById('hidden-text').value = editor.getValue();
+    }
+</script>
+{% endblock %}
