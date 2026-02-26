@@ -26,6 +26,18 @@ services:
     restart: always
     # If using a GPU, you'll need additional nvidia-docker config here
     command: celery -A worker.tasks worker --loglevel=info --concurrency=1
+  
+  webui:
+    build: .
+    command: uvicorn web.main:app --host 0.0.0.0 --port 8000
+    volumes:
+      - ./voices:/app/voices
+      - shared_data:/app/shared
+    env_file: .env
+    ports:
+      - "8000:8000"
+    depends_on:
+      - redis
 
 volumes:
   shared_data:
