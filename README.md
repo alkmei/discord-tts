@@ -82,6 +82,11 @@ marius: I'm doing good!
 - Configure `.env` (Discord bot token, etc.)
 - Run the bot with Python
 
+## WebUI
+
+There's a web ui built with FastAPI + HTMX. It's a really simple UI that will allow you to play text outside of Discord.
+Note that it doesn't have any protection, so be cautious when deploying it publicly.
+
 ## Links & Resources
 
 - [Pocket-TTS repository](https://github.com/kyutai-labs/pocket-tts)
