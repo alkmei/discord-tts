@@ -6,6 +6,7 @@ services:
 
   bot:
     build: .
+    image: discord-tts-app:latest
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
@@ -17,6 +18,7 @@ services:
 
   worker:
     build: .
+    image: discord-tts-app:latest
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
@@ -29,6 +31,7 @@ services:
   
   webui:
     build: .
+    image: discord-tts-app:latest
     command: uvicorn web.main:app --host 0.0.0.0 --port 8000
     volumes:
       - ./voices:/app/voices

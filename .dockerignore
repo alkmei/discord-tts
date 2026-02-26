@@ -1,6 +1,14 @@
-voices
-.git
-.github
-.venv
-__pycache__
+# Ignore local python environment
+.venv/
+venv/
+env/
+
+# Ignore local audio/model files (these should be mounted via volumes, not baked in)
+voices/
+shared/
+
+# Ignore git and caches
+.git/
+__pycache__/
 *.pyc
+.pytest_cache/

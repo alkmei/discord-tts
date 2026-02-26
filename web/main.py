@@ -1,7 +1,9 @@
 # web/main.py
 import os
 import uuid
-from fastapi import FastAPI, Form, Request
+import json
+import redis
+from fastapi import FastAPI, Form
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from celery import Celery
@@ -10,13 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 app = FastAPI()
-
-# --- Configuration ---
 REDIS_URL = os.getenv("REDIS_URL")
+r_client = redis.from_url(REDIS_URL)
+celery_app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
+
 VOICES_DIR = "/app/voices"
 SHARED_DIR = "/app/shared"
-
-celery_app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
 
 if not os.path.exists(SHARED_DIR):
     os.makedirs(SHARED_DIR)
@@ -33,33 +34,67 @@ def get_available_voices():
     return sorted(voices)
 
 
-# --- HTML Templates ---
-
 BASE_HTML = """
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>TTS WebUI</title>
+    <title>TTS Web Control</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.6"></script>
     <style>
-        body {{ background-color: #f8f9fa; }}
-        .main-card {{ max-width: 800px; margin: 50px auto; border-radius: 15px; border: none; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }}
-        .htmx-indicator {{ display: none; }}
-        .htmx-request .htmx-indicator {{ display: block; }}
-        .htmx-request.btn-primary {{ display: none; }}
+        body {{ background-color: #121212; color: #e0e0e0; }}
+        .main-card {{ max-width: 900px; margin: 40px auto; background: #1e1e1e; border: 1px solid #333; border-radius: 12px; }}
+        .form-control, .form-select {{ background-color: #2b2b2b; border: 1px solid #444; color: #fff; }}
+        .form-control:focus, .form-select:focus {{ background-color: #333; color: #fff; border-color: #0d6efd; box-shadow: none; }}
+        .alert-info {{ background-color: #0c5460; border: none; color: #bee5eb; }}
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="card main-card">
-            <div class="card-header bg-primary text-white text-center py-3">
-                <h2 class="mb-0">Pocket TTS Generator</h2>
+        <div class="card main-card shadow-lg">
+            <div class="card-header border-secondary py-3">
+                <h3 class="mb-0">Broadcast to Discord</h3>
             </div>
             <div class="card-body p-4">
-                {content}
+                <form hx-post="/generate" hx-target="#result-area" hx-indicator="#spinner">
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary">Discord Server (Guild) ID</label>
+                            <input type="text" name="guild_id" class="form-control form-control-lg" placeholder="Required for Discord playback">
+                            <div class="form-text text-muted small">Right-click server icon > Copy ID</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-primary">Your Name</label>
+                            <input type="text" name="user_name" class="form-control form-control-lg" placeholder="Web User" value="Web User">
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Select Voice</label>
+                        <select name="voice" class="form-select form-select-lg">
+                            {"".join([f'<option value="{v}">{v}</option>' for v in get_available_voices()])}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Long Text Input</label>
+                        <textarea name="text" class="form-control" rows="10" placeholder="Enter chunks of text..."></textarea>
+                    </div>
+
+                    <div class="d-grid">
+                        <button type="submit" class="btn btn-primary btn-lg py-3 fw-bold">
+                            SEND TO DISCORD VOICE
+                        </button>
+                    </div>
+
+                    <div id="spinner" class="htmx-indicator text-center mt-3">
+                        <div class="spinner-border text-primary" role="status"></div>
+                        <span class="ms-2">Processing...</span>
+                    </div>
+                </form>
+
+                <div id="result-area" class="mt-4"></div>
             </div>
         </div>
     </div>
@@ -70,55 +105,46 @@ BASE_HTML = """
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
-    voices = get_available_voices()
-    options = "".join([f'<option value="{v}">{v}</option>' for v in voices])
-
-    content = f"""
-    <form hx-post="/generate" hx-target="#result-area" hx-indicator="#spinner">
-        <div class="mb-3">
-            <label class="form-label fw-bold">Select Voice</label>
-            <select name="voice" class="form-select form-select-lg">{options}</select>
-        </div>
-        <div class="mb-3">
-            <label class="form-label fw-bold">Text to Synthesize</label>
-            <textarea name="text" class="form-control" rows="8" placeholder="Paste your long text here..."></textarea>
-        </div>
-        <div class="d-grid">
-            <button type="submit" class="btn btn-primary btn-lg" id="submit-btn">
-                Generate Audio
-            </button>
-            <div id="spinner" class="htmx-indicator text-center mt-3">
-                <div class="spinner-border text-primary" role="status"></div>
-                <p class="mt-2 text-muted">Sending to Worker...</p>
-            </div>
-        </div>
-    </form>
-    
-    <div id="result-area" class="mt-4">
-        <!-- Result or status updates will appear here via HTMX -->
-    </div>
-    """
-    return BASE_HTML.format(content=content)
+    return BASE_HTML
 
 
 @app.post("/generate", response_class=HTMLResponse)
-async def generate(text: str = Form(...), voice: str = Form(...)):
+async def generate(
+    text: str = Form(...),
+    voice: str = Form(...),
+    guild_id: str = Form(...),
+    user_name: str = Form(...),
+):
+    if not text.strip():
+        return '<div class="alert alert-warning">Please enter some text.</div>'
+
     task_id = str(uuid.uuid4())
     filename = f"web_{task_id}.wav"
 
-    # Dispatch to Celery
+    # 1. Dispatch work to Celery
     celery_app.send_task(
         "worker.tasks.generate_tts_task", args=[text, voice, filename], task_id=task_id
     )
 
-    # Return the "Status Poller" component
+    # 2. Notify Discord Bot via Redis
+    if guild_id.strip().isdigit():
+        payload = {
+            "guild_id": int(guild_id),
+            "task_id": task_id,
+            "voice_name": voice,
+            "text": text[:100] + "..." if len(text) > 100 else text,
+            "user_name": user_name,
+        }
+        r_client.publish("web_tts_requests", json.dumps(payload))
+        status_msg = f"Broadcasting to Server {guild_id}..."
+    else:
+        status_msg = "Generating web preview (No valid Guild ID provided)..."
+
     return f"""
     <div class="alert alert-info d-flex align-items-center" 
-         hx-get="/status/{task_id}/{filename}" 
-         hx-trigger="every 1s" 
-         hx-swap="outerHTML">
-        <div class="spinner-border spinner-border-sm me-3" role="status"></div>
-        <span>Generating audio file... Task ID: <code>{task_id[:8]}</code></span>
+         hx-get="/status/{task_id}/{filename}" hx-trigger="every 1s" hx-swap="outerHTML">
+        <div class="spinner-border spinner-border-sm me-3"></div>
+        <span>{status_msg}</span>
     </div>
     """
 
@@ -126,39 +152,20 @@ async def generate(text: str = Form(...), voice: str = Form(...)):
 @app.get("/status/{task_id}/{filename}", response_class=HTMLResponse)
 async def status(task_id: str, filename: str):
     res = celery_app.AsyncResult(task_id)
-
     if res.ready():
-        if res.state == "SUCCESS":
-            return f"""
-            <div class="card border-success">
-                <div class="card-body text-center">
-                    <h5 class="text-success mb-3">Generation Complete!</h5>
-                    <audio controls class="w-100 mb-3 shadow-sm">
-                        <source src="/static/audio/{filename}" type="audio/wav">
-                        Your browser does not support the audio element.
-                    </audio>
-                    <div class="d-flex justify-content-center gap-2">
-                        <a href="/static/audio/{filename}" download class="btn btn-outline-success btn-sm">Download WAV</a>
-                        <button onclick="window.location.reload()" class="btn btn-outline-secondary btn-sm">Clear</button>
-                    </div>
-                </div>
+        return f"""
+        <div class="card border-success bg-dark text-white shadow-sm">
+            <div class="card-body text-center">
+                <h6 class="text-success mb-3">✅ Generation Complete</h6>
+                <audio controls class="w-100 mb-2"><source src="/static/audio/{filename}" type="audio/wav"></audio>
+                <p class="small text-muted mb-0">The Discord bot is now playing this file.</p>
             </div>
-            """
-        else:
-            return f"""
-            <div class="alert alert-danger">
-                <strong>Error:</strong> Generation failed. <br>
-                <button onclick="window.location.reload()" class="btn btn-sm btn-danger mt-2">Try Again</button>
-            </div>
-            """
-
-    # If not ready, return the same polling div to keep the loop going
+        </div>
+        """
     return f"""
     <div class="alert alert-info d-flex align-items-center" 
-         hx-get="/status/{task_id}/{filename}" 
-         hx-trigger="every 1s" 
-         hx-swap="outerHTML">
-        <div class="spinner-border spinner-border-sm me-3" role="status"></div>
-        <span>Worker is processing text...</span>
+         hx-get="/status/{task_id}/{filename}" hx-trigger="every 1s" hx-swap="outerHTML">
+        <div class="spinner-border spinner-border-sm me-3"></div>
+        <span>Worker is synthesizing audio...</span>
     </div>
     """

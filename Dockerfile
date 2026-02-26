@@ -23,7 +23,7 @@ COPY pyproject.toml uv.lock ./
 
 # Install dependencies using uv
 # --frozen ensures we use the exact versions in the lockfile
-RUN uv sync --frozen --no-install-project --no-dev
+RUN uv sync --frozen --no-install-project --no-dev --no-cache
 
 # Copy the rest of the application code
 COPY . .

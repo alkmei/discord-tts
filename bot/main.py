@@ -5,6 +5,7 @@ import asyncio
 import os
 import uuid
 from dotenv import load_dotenv
+import redis.asyncio as aioredis
 
 load_dotenv()
 
@@ -133,12 +134,65 @@ async def add_to_tts_queue(guild_id, user_name, text, voice_name):
     await guild_queues[guild_id].put(request)
 
 
+async def listen_for_web_requests():
+    """Background task to receive TTS requests from the Web UI."""
+    r = aioredis.from_url(REDIS_URL)
+    pubsub = r.pubsub()
+    await pubsub.subscribe("web_tts_requests")
+
+    while True:
+        try:
+            message = await pubsub.get_message(ignore_subscribe_messages=True)
+            if message:
+                data = json.loads(message["data"])
+                guild_id = data["guild_id"]
+
+                # Find the guild and check if bot is in a voice channel there
+                guild = bot.get_guild(guild_id)
+                if not guild:
+                    print(f"❌ Web request ignored: Guild {guild_id} not found.")
+                    continue
+
+                vc = guild.voice_client
+                if not vc:
+                    print(
+                        f"❌ Web request ignored: Not in a voice channel in {guild.name}."
+                    )
+                    continue
+
+                # Add to queue
+                task_id = data["task_id"]
+                filename = f"web_{task_id}.wav"
+                filepath = os.path.join(SHARED_DIR, filename)
+
+                request = TTSRequest(
+                    task=celery_app.AsyncResult(task_id),
+                    user_name=data["user_name"],
+                    text=data["text"],
+                    filepath=filepath,
+                )
+
+                if guild_id not in guild_queues:
+                    guild_queues[guild_id] = asyncio.Queue()
+                    processing_tasks[guild_id] = asyncio.create_task(
+                        process_queue(guild_id)
+                    )
+
+                await guild_queues[guild_id].put(request)
+
+            await asyncio.sleep(0.5)  # Prevent CPU spinning
+        except Exception as e:
+            print(f"Web Listener Error: {e}")
+            await asyncio.sleep(5)
+
+
 # --- Events ---
 
 
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name}")
+    bot.loop.create_task(listen_for_web_requests())
 
 
 @bot.event
