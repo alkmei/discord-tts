@@ -7,21 +7,19 @@ import asyncio
 import os
 import uuid
 from dotenv import load_dotenv
-import redis.asyncio as aioredis
+import aio_pika
 
 load_dotenv()
 
 # --- Configuration ---
 TOKEN = os.getenv("DISCORD_BOT_TOKEN")
-REDIS_URL = os.getenv("REDIS_URL")
+RABBITMQ_URL = os.getenv("RABBITMQ_URL")
 PREFIX = "!"
 VOICES_DIR = "/app/voices"
 SHARED_DIR = "/app/shared"
 
-# --- Setup Celery App ---
-celery_app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
+celery_app = Celery("tts_worker", broker=RABBITMQ_URL, backend="rpc://")
 
-# --- Bot Setup ---
 intents = discord.Intents.default()
 intents.message_content = True
 intents.voice_states = True
@@ -76,7 +74,6 @@ async def process_queue(guild_id):
             continue
 
         try:
-            # 1. Wait for Celery worker to finish this specific task
             while not request.task.ready():
                 await asyncio.sleep(0.1)
 
@@ -86,11 +83,9 @@ async def process_queue(guild_id):
                 guild_queues[guild_id].task_done()
                 continue
 
-            # 2. Wait for the voice client to finish playing the previous audio
             while vc.is_playing():
                 await asyncio.sleep(0.1)
 
-            # 3. Play the Audio
             if os.path.exists(request.filepath):
                 source = discord.FFmpegPCMAudio(request.filepath)
                 play_done = asyncio.Event()
@@ -137,16 +132,21 @@ async def add_to_tts_queue(guild_id, user_name, text, voice_name):
 
 
 async def listen_for_web_requests():
-    """Background task to receive TTS requests from the Web UI."""
-    r = aioredis.from_url(REDIS_URL)
-    pubsub = r.pubsub()
-    await pubsub.subscribe("web_tts_requests")
+    """Background task to receive TTS requests from the Web UI via RabbitMQ."""
+    connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    channel = await connection.channel()
 
-    while True:
+    # Declare exchange and queue for web TTS requests
+    exchange = await channel.declare_exchange(
+        "web_tts_requests", aio_pika.ExchangeType.FANOUT, durable=True
+    )
+    queue = await channel.declare_queue("", exclusive=True)
+    await queue.bind(exchange)
+
+    async for message in queue:
         try:
-            message = await pubsub.get_message(ignore_subscribe_messages=True)
-            if message:
-                data = json.loads(message["data"])
+            async with message.process():
+                data = json.loads(message.body.decode())
                 guild_id = data["guild_id"]
 
                 # Find the guild and check if bot is in a voice channel there
@@ -182,15 +182,11 @@ async def listen_for_web_requests():
 
                 await guild_queues[guild_id].put(request)
 
-            await asyncio.sleep(0.5)  # Prevent CPU spinning
         except Exception as e:
             print(f"Web Listener Error: {e}")
-            await asyncio.sleep(5)
 
 
 # --- Events ---
-
-
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name}")

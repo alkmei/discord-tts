@@ -5,6 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
+    "aio-pika>=9.6.0",
     "beartype>=0.22.9",
     "celery>=5.6.2",
     "celery-types>=0.24.0",
@@ -14,7 +15,6 @@ dependencies = [
     "pynacl>=1.6.0",
     "python-dotenv>=1.1.1",
     "python-multipart>=0.0.22",
-    "redis>=7.1.1",
     "scipy>=1.17.0",
     "uvicorn>=0.40.0",
 ]

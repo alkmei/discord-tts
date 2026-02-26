@@ -1,7 +1,7 @@
 import os
 import uuid
 import json
-import redis
+import aio_pika
 from fastapi import FastAPI, Form, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
@@ -15,14 +15,37 @@ app = FastAPI()
 templates = Jinja2Templates(directory="web/templates")
 
 # --- Config ---
-REDIS_URL = os.getenv("REDIS_URL")
-r_client = redis.from_url(REDIS_URL)
-celery_app = Celery("tts_worker", broker=REDIS_URL, backend=REDIS_URL)
+RABBITMQ_URL = os.getenv("RABBITMQ_URL")
+celery_app = Celery("tts_worker", broker=RABBITMQ_URL, backend="rpc://")
 
 SHARED_DIR = "/app/shared"
 VOICES_DIR = "/app/voices"
 
 app.mount("/static/audio", StaticFiles(directory=SHARED_DIR), name="audio")
+
+# RabbitMQ connection and channel will be initialized on startup
+rabbitmq_connection = None
+rabbitmq_channel = None
+rabbitmq_exchange = None
+
+
+@app.on_event("startup")
+async def startup():
+    """Initialize RabbitMQ connection on startup."""
+    global rabbitmq_connection, rabbitmq_channel, rabbitmq_exchange
+    rabbitmq_connection = await aio_pika.connect_robust(RABBITMQ_URL)
+    rabbitmq_channel = await rabbitmq_connection.channel()
+    rabbitmq_exchange = await rabbitmq_channel.declare_exchange(
+        "web_tts_requests", aio_pika.ExchangeType.FANOUT, durable=True
+    )
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    """Close RabbitMQ connection on shutdown."""
+    global rabbitmq_connection
+    if rabbitmq_connection:
+        await rabbitmq_connection.close()
 
 
 def get_available_voices():
@@ -110,7 +133,10 @@ async def generate(request: Request, text: str = Form(...), guild_id: str = Form
                 "text": line_data["text"][:100],
                 "user_name": "Web User",
             }
-            r_client.publish("web_tts_requests", json.dumps(payload))
+            # Publish to RabbitMQ exchange
+            await rabbitmq_exchange.publish(
+                aio_pika.Message(body=json.dumps(payload).encode()), routing_key=""
+            )
 
     return templates.TemplateResponse(
         "partials/result.html",

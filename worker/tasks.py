@@ -5,9 +5,7 @@ from functools import lru_cache
 from pocket_tts import TTSModel
 
 # Initialize Celery
-app = Celery(
-    "tts_worker", broker=os.getenv("REDIS_URL"), backend=os.getenv("REDIS_URL")
-)
+app = Celery("tts_worker", broker=os.getenv("RABBITMQ_URL"), backend="rpc://")
 
 # Global model variable (loaded once when worker starts)
 tts_model = None
