@@ -17,7 +17,6 @@ services:
     command: python bot/main.py
 
   worker:
-    build: .
     image: discord-tts-app:latest
     volumes:
       - ./voices:/app/voices
@@ -30,7 +29,6 @@ services:
     command: celery -A worker.tasks worker --loglevel=info --concurrency=1
   
   webui:
-    build: .
     image: discord-tts-app:latest
     command: uvicorn web.main:app --host 0.0.0.0 --port 8000
     volumes:
