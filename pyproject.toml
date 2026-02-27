@@ -19,11 +19,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "pyright>=1.1.408",
-    "ruff>=0.15.4",
-    "scipy-stubs>=1.17.1.0",
-]
+dev = ["pyright>=1.1.408", "ruff>=0.15.4", "scipy-stubs>=1.17.1.0"]
 
 [tool.ruff]
 line-length = 120
@@ -42,7 +38,7 @@ ignore = [
     "TID", # flake8-tidy-imports
 
     #### specific rules
-    "D100",   # ignore missing docs
+    "D100",    # ignore missing docs
     "D101",
     "D102",
     "D103",
@@ -56,10 +52,12 @@ ignore = [
     "D400",
     "D401",
     "D415",
-    "E402",   # false positives for local imports
-    "E501",   # line too long
-    "TRY003", # external messages in exceptions are too verbose
+    "E402",    # false positives for local imports
+    "E501",    # line too long
+    "TRY003",  # external messages in exceptions are too verbose
     "TD002",
     "TD003",
-    "FIX002", # too verbose descriptions of todos
+    "FIX002",  # too verbose descriptions of todos
+    "T201",    # Printing is fine!
+    "PLR0911", # too many branches is fine in some cases
 ]

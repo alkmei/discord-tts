@@ -273,32 +273,46 @@ async def on_message(message: discord.Message) -> None:
     """Process incoming messages for commands and auto-TTS."""
     if message.author.bot:
         return
+
     await bot.process_commands(message)
-    if message.content.startswith(PREFIX):
+
+    # Combine prefix and URL check (startswith accepts a tuple)
+    if message.content.startswith((PREFIX, "http://", "https://")):
         return
 
-    if message.content.startswith("https://") or message.content.startswith("http://"):
+    # Ensure we are in a guild and author is a Member
+    if not message.guild or not isinstance(message.author, discord.Member):
         return
 
-    # Auto-TTS logic
-    if (
-        message.guild
-        and message.guild.id in bound_channels
-        and message.channel.id == bound_channels[message.guild.id]
-        and message.author.voice  # type: ignore[union-attr]
-        and message.author.voice.channel  # type: ignore[union-attr]
-    ):
-        vc: discord.VoiceClient | None = message.guild.voice_client  # type: ignore[assignment]
-        author_voice: discord.VoiceState = message.author.voice  # type: ignore[union-attr, assignment]
-        if vc and vc.channel == author_voice.channel and (author_voice.self_mute or author_voice.mute):
-            voice_name: str = user_voice_selections.get(message.author.id, "alba")
-            text_to_say: str = f"{message.author.display_name} says: {message.content}"
-            await add_to_tts_queue(
-                message.guild.id,
-                message.author.display_name,
-                text_to_say,
-                voice_name,
-            )
+    guild_id = message.guild.id
+
+    # Ensure channel is bound
+    if guild_id not in bound_channels or message.channel.id != bound_channels[guild_id]:
+        return
+
+    # Ensure author is in a voice channel
+    voice_state = message.author.voice
+    if not voice_state or not voice_state.channel:
+        return
+
+    # Ensure bot is in the SAME voice channel
+    vc = message.guild.voice_client
+    if not isinstance(vc, discord.VoiceClient) or vc.channel != voice_state.channel:
+        return
+
+    # Ensure author is actually muted (the trigger for auto-TTS)
+    if not (voice_state.self_mute or voice_state.mute):
+        return
+
+    voice_name: str = user_voice_selections.get(message.author.id, "alba")
+    text_to_say: str = f"{message.author.display_name} says: {message.content}"
+
+    await add_to_tts_queue(
+        guild_id,
+        message.author.display_name,
+        text_to_say,
+        voice_name,
+    )
 
 
 # --- Commands ---

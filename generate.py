@@ -1,5 +1,5 @@
 import os
-import torch
+
 import scipy.io.wavfile
 from pocket_tts import TTSModel
 
@@ -61,7 +61,7 @@ def process_script():
         return
 
     # 2. Read and Parse Script
-    with open(INPUT_SCRIPT, "r", encoding="utf-8") as f:
+    with open(INPUT_SCRIPT, encoding="utf-8") as f:
         lines = [line.strip() for line in f if line.strip()]
 
     print(f"📖 Processing {len(lines)} lines...")

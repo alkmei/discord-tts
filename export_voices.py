@@ -1,6 +1,6 @@
-import subprocess
-import shutil
 import argparse
+import shutil
+import subprocess
 from pathlib import Path
 
 # Supported audio extensions
