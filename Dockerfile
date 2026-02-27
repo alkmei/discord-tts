@@ -31,25 +31,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
-# Create a non-root user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
 WORKDIR /app
 
+# Set environment variables
 ENV HF_HOME=/app/.cache/huggingface
 ENV PYTHONUNBUFFERED=1
 ENV PATH="/app/.venv/bin:$PATH"
 
-# Create all necessary directories and give ownership to appuser
-RUN mkdir -p /app/voices /app/shared /app/.cache/huggingface && \
-    chown -R appuser:appuser /app
+# Create necessary directories
+RUN mkdir -p /app/voices /app/shared /app/.cache/huggingface
 
-# Copy the virtual environment and app
-COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
-COPY --from=builder --chown=appuser:appuser /app /app
-
-USER appuser
-
-# Entrypoint
-ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "main.py"]
+# Copy the virtual environment and app from builder
+COPY --from=builder /app/.venv /app/.venv
+COPY --from=builder /app /app
