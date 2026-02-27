@@ -44,4 +44,4 @@ fi
 
 # 5. Run the command
 echo "Generating: $OUTPUT_PATH"
-uv run pocket-tts --text "$TEXT" --voice "$VOICE_PATH" --output-path "$OUTPUT_PATH"
+uv run pocket-tts generate --text "$TEXT" --voice "$VOICE_PATH" --output-path "$OUTPUT_PATH"
