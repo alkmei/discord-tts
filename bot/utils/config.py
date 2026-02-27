@@ -17,7 +17,7 @@ RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "")
 PREFIX: str = "!"
 VOICES_DIR: Path = Path("/app/voices")
 SHARED_DIR: Path = Path("/app/shared")
-DB_PATH: Path = Path("/app/data/state.sqlite")
+DB_PATH: Path = Path("/app/data")
 
 # Constants for queue display
 TEXT_PREVIEW_LENGTH: int = 50
