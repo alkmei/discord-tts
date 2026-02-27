@@ -51,4 +51,5 @@ COPY --from=builder --chown=appuser:appuser /app /app
 USER appuser
 
 # Entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "main.py"]
