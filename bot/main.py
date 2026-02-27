@@ -17,6 +17,7 @@ if TYPE_CHECKING:
     from discord.ext.commands import Context  # type: ignore[import]
 
 import aio_pika
+import aiosqlite
 import discord
 from celery import Celery
 from discord.ext import commands
@@ -32,6 +33,7 @@ RABBITMQ_URL: str = os.getenv("RABBITMQ_URL", "")
 PREFIX: str = "!"
 VOICES_DIR: Path = Path("/app/voices")
 SHARED_DIR: Path = Path("/app/shared")
+DB_PATH: Path = Path("/app/data/state.sqlite")
 
 # Constants for queue display
 TEXT_PREVIEW_LENGTH: int = 50
@@ -51,11 +53,83 @@ logging.basicConfig(level=logging.INFO)
 logger: logging.Logger = logging.getLogger(__name__)
 
 # --- State ---
-user_voice_selections: dict[int, str] = {}  # UserID -> Voice Name
-bound_channels: dict[int, int] = {}  # GuildID -> ChannelID
 guild_queues: dict[int, asyncio.Queue[TTSRequest]] = {}  # GuildID -> asyncio.Queue
 processing_tasks: dict[int, asyncio.Task[None]] = {}  # GuildID -> Task
 currently_playing: dict[int, TTSRequest | None] = {}  # GuildID -> TTSRequest
+
+
+# --- Database Utilities ---
+
+
+async def init_db() -> None:
+    """Initialize the SQLite database and create tables if they don't exist."""
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_voice_selections (
+                user_id INTEGER PRIMARY KEY,
+                voice_name TEXT NOT NULL
+            )
+            """
+        )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS bound_channels (
+                guild_id INTEGER PRIMARY KEY,
+                channel_id INTEGER NOT NULL
+            )
+            """
+        )
+        await db.commit()
+
+
+async def get_user_voice(user_id: int) -> str | None:
+    """Get the voice selection for a user from the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT voice_name FROM user_voice_selections WHERE user_id = ?",
+            (user_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+
+async def set_user_voice(user_id: int, voice_name: str) -> None:
+    """Set or update the voice selection for a user in the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO user_voice_selections (user_id, voice_name) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET voice_name = excluded.voice_name
+            """,
+            (user_id, voice_name),
+        )
+        await db.commit()
+
+
+async def get_bound_channel(guild_id: int) -> int | None:
+    """Get the bound channel for a guild from the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        async with db.execute(
+            "SELECT channel_id FROM bound_channels WHERE guild_id = ?",
+            (guild_id,),
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else None
+
+
+async def set_bound_channel(guild_id: int, channel_id: int) -> None:
+    """Set or update the bound channel for a guild in the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO bound_channels (guild_id, channel_id) VALUES (?, ?)
+            ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
+            """,
+            (guild_id, channel_id),
+        )
+        await db.commit()
 
 
 def get_available_voices() -> list[str]:
@@ -263,6 +337,7 @@ async def listen_for_web_requests() -> None:
 @bot.event
 async def on_ready() -> None:
     """Called when the bot is ready and connected to Discord."""
+    await init_db()
     if bot.user:
         logger.info("Logged in as %s", bot.user.name)
     bot.loop.create_task(listen_for_web_requests())
@@ -287,7 +362,8 @@ async def on_message(message: discord.Message) -> None:
     guild_id = message.guild.id
 
     # Ensure channel is bound
-    if guild_id not in bound_channels or message.channel.id != bound_channels[guild_id]:
+    bound_channel_id = await get_bound_channel(guild_id)
+    if bound_channel_id is None or message.channel.id != bound_channel_id:
         return
 
     # Ensure author is in a voice channel
@@ -304,7 +380,7 @@ async def on_message(message: discord.Message) -> None:
     if not (voice_state.self_mute or voice_state.mute):
         return
 
-    voice_name: str = user_voice_selections.get(message.author.id, "alba")
+    voice_name: str = await get_user_voice(message.author.id) or "alba"
     text_to_say: str = f"{message.author.display_name} says: {message.content}"
 
     await add_to_tts_queue(
@@ -332,7 +408,7 @@ async def join(ctx: Context[commands.Bot]) -> None:
         await channel.connect()
 
     if ctx.guild:
-        bound_channels[ctx.guild.id] = ctx.channel.id  # type: ignore[union-attr]
+        await set_bound_channel(ctx.guild.id, ctx.channel.id)  # type: ignore[union-attr]
     await ctx.send(f"Joined **{channel.name}** and bound to this text channel.")
 
 
@@ -386,22 +462,6 @@ async def queue(ctx: Context[commands.Bot]) -> None:
 
 
 @bot.command()
-async def t(ctx: Context[commands.Bot], *, text: str) -> None:
-    """Say text with username prefix."""
-    if not ctx.voice_client:
-        await ctx.send("Use `!join` first.")
-        return
-
-    if not ctx.guild:
-        await ctx.send("This command must be used in a server.")
-        return
-
-    voice_name: str = user_voice_selections.get(ctx.author.id, "alba")
-    text_to_say: str = f"{ctx.author.display_name} says: {text}"
-    await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text_to_say, voice_name)
-
-
-@bot.command()
 async def s(ctx: Context[commands.Bot], *, text: str) -> None:
     """Say text without username prefix."""
     if not ctx.voice_client:
@@ -412,7 +472,7 @@ async def s(ctx: Context[commands.Bot], *, text: str) -> None:
         await ctx.send("This command must be used in a server.")
         return
 
-    voice_name: str = user_voice_selections.get(ctx.author.id, "alba")
+    voice_name: str = await get_user_voice(ctx.author.id) or "alba"
     await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text, voice_name)
 
 
@@ -427,6 +487,9 @@ async def multi(ctx: Context[commands.Bot], *, text: str) -> None:
         await ctx.send("This command must be used in a server.")
         return
 
+    # Get user's default voice once for efficiency
+    default_voice: str = await get_user_voice(ctx.author.id) or "alba"
+
     # For each line, if it starts with valid_voice:, use that voice for the line
     lines: list[str] = text.splitlines()
     for line in lines:
@@ -440,7 +503,7 @@ async def multi(ctx: Context[commands.Bot], *, text: str) -> None:
                 continue
 
         # If no valid voice prefix, use default
-        voice_name = user_voice_selections.get(ctx.author.id, "alba")
+        voice_name = default_voice
         text_to_say = line.strip()
         await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text_to_say, voice_name)
 
@@ -474,7 +537,7 @@ async def voice(ctx: Context[commands.Bot], name: str) -> None:
         await ctx.send(f"Voice `{name}` not found. Available: {', '.join(available)}")
         return
 
-    user_voice_selections[ctx.author.id] = name
+    await set_user_voice(ctx.author.id, name)
     await ctx.send(f"Voice set to **{name}**")
 
 
