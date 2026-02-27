@@ -1,71 +1,90 @@
+"""Celery worker tasks for TTS generation."""
+
+from __future__ import annotations
+
+import logging
 import os
+from functools import lru_cache
+from pathlib import Path
+from typing import TYPE_CHECKING
+
 import scipy.io.wavfile
 from celery import Celery
-from functools import lru_cache
-from pocket_tts import TTSModel
+from pocket_tts import TTSModel  # type: ignore[import]
+
+if TYPE_CHECKING:
+    import torch
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger: logging.Logger = logging.getLogger(__name__)
 
 # Initialize Celery
-app = Celery(
-    "tts_worker", broker=os.getenv("REDIS_URL"), backend=os.getenv("REDIS_URL")
-)
+app: Celery = Celery("tts_worker", broker=os.getenv("RABBITMQ_URL"), backend="rpc://")
+
+# Constants
+VOICES_DIR: Path = Path("/app/voices")
+SHARED_DIR: Path = Path("/app/shared")
+LRU_CACHE_SIZE: int = 4
+
 
 # Global model variable (loaded once when worker starts)
-tts_model = None
+# Using a class to avoid global statement issues
+class ModelState:
+    """Container for the TTS model singleton."""
+
+    model: TTSModel | None = None
 
 
-def get_model():
+def get_model() -> TTSModel:
     """Singleton to load the base model only once."""
-    global tts_model
-    if tts_model is None:
-        print("⏳ Worker: Loading Base Pocket TTS Model...")
-        tts_model = TTSModel.load_model()
-        print(f"✅ Worker: Model loaded on {tts_model.device}")
-    return tts_model
+    if ModelState.model is None:
+        logger.info("Worker: Loading Base Pocket TTS Model...")
+        ModelState.model = TTSModel.load_model()
+        logger.info("Worker: Model loaded on %s", ModelState.model.device)
+    return ModelState.model
 
 
-@lru_cache(maxsize=4)
-def get_cached_voice_state(voice_name):
+@lru_cache(maxsize=LRU_CACHE_SIZE)
+def get_cached_voice_state(voice_name: str) -> torch.Tensor:
     """
     Loads voice state from disk.
     Keeps only the last 4 used voices in memory.
     """
-    model = get_model()
-    voices_dir = "/app/voices"
+    model: TTSModel = get_model()
 
     # Try safetensors first, then wav
-    safe_path = os.path.join(voices_dir, f"{voice_name}.safetensors")
-    wav_path = os.path.join(voices_dir, f"{voice_name}.wav")
+    safe_path: Path = VOICES_DIR / f"{voice_name}.safetensors"
+    wav_path: Path = VOICES_DIR / f"{voice_name}.wav"
 
-    target_path = None
-    if os.path.exists(safe_path):
+    target_path: Path | None = None
+    if safe_path.exists():
         target_path = safe_path
-    elif os.path.exists(wav_path):
+    elif wav_path.exists():
         target_path = wav_path
 
     if target_path:
-        print(f"📂 Worker: Loading voice '{voice_name}' into LRU Cache.")
-        return model.get_state_for_audio_prompt(target_path)
+        logger.info("Worker: Loading voice '%s' into LRU Cache.", voice_name)
+        return model.get_state_for_audio_prompt(str(target_path))  # type: ignore[return-value]
 
     # Fallback to a default if file not found (or raise error)
-    print(f"⚠️ Worker: Voice {voice_name} not found, using internal default.")
-    return model.get_state_for_audio_prompt("alba")  # internal default
+    logger.warning("Worker: Voice %s not found, using internal default.", voice_name)
+    return model.get_state_for_audio_prompt("alba")  # type: ignore[return-value] # internal default
 
 
 @app.task
-def generate_tts_task(text, voice_name, output_filename):
-    """
-    Celery Task: Generates audio and saves to shared volume.
-    """
-    model = get_model()
+def generate_tts_task(text: str, voice_name: str, output_filename: str) -> str:
+    """Celery Task: Generates audio and saves to shared volume."""
+    model: TTSModel = get_model()
 
     # Get voice from LRU cache
-    voice_state = get_cached_voice_state(voice_name)
+    voice_state: torch.Tensor = get_cached_voice_state(voice_name)
 
-    # Generate Audio. The "." prefix improves prosidy.
-    audio_tensor = model.generate_audio(voice_state, "." + text)
+    # Generate Audio. The "." prefix improves prosody.
+    audio_tensor: torch.Tensor = model.generate_audio(voice_state, "." + text)  # type: ignore[arg-type]
 
     # Save to shared volume
-    output_path = os.path.join("/app/shared", output_filename)
-    scipy.io.wavfile.write(output_path, model.sample_rate, audio_tensor.cpu().numpy())
+    output_path: Path = SHARED_DIR / output_filename
+    scipy.io.wavfile.write(str(output_path), model.sample_rate, audio_tensor.cpu().numpy())
 
-    return output_path
+    return str(output_path)
