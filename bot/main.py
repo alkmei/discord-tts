@@ -28,6 +28,7 @@ COGS: list[str] = [
     ".cogs.voice_cog",
     ".cogs.join_cog",
     ".cogs.event_cog",
+    ".cogs.prefix_cog",
 ]
 
 

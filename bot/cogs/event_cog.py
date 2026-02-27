@@ -6,7 +6,7 @@ import discord
 from discord.ext import commands
 
 from ..utils.config import PREFIX, logger
-from ..utils.db import get_bound_channel, get_user_voice, init_db
+from ..utils.db import get_bound_channel, get_user_prefix_enabled, get_user_voice, init_db
 from ..utils.queue import add_to_tts_queue
 from ..utils.web_listener import listen_for_web_requests
 
@@ -61,7 +61,12 @@ class EventCog(commands.Cog):
             return
 
         voice_name: str = await get_user_voice(message.author.id) or "alba"
-        text_to_say: str = f"{message.author.display_name} says: {message.content}"
+        prefix_enabled: bool = await get_user_prefix_enabled(message.author.id)
+
+        if prefix_enabled:
+            text_to_say: str = f"{message.author.display_name} says: {message.content}"
+        else:
+            text_to_say: str = message.content
 
         await add_to_tts_queue(
             guild_id,

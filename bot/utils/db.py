@@ -27,6 +27,14 @@ async def init_db() -> None:
             )
             """
         )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS user_prefix_settings (
+                user_id INTEGER PRIMARY KEY,
+                prefix_enabled INTEGER NOT NULL DEFAULT 1
+            )
+            """
+        )
         await db.commit()
 
 
@@ -78,5 +86,32 @@ async def set_bound_channel(guild_id: int, channel_id: int) -> None:
             ON CONFLICT(guild_id) DO UPDATE SET channel_id = excluded.channel_id
             """,
             (guild_id, channel_id),
+        )
+        await db.commit()
+
+
+async def get_user_prefix_enabled(user_id: int) -> bool:
+    """Get whether speech prefix is enabled for a user. Returns True if not set."""
+    async with (
+        aiosqlite.connect(DB_PATH) as db,
+        db.execute(
+            "SELECT prefix_enabled FROM user_prefix_settings WHERE user_id = ?",
+            (user_id,),
+        ) as cursor,
+    ):
+        row = await cursor.fetchone()
+        # Default to True (enabled) if not set
+        return bool(row[0]) if row else True
+
+
+async def set_user_prefix_enabled(user_id: int, enabled: bool) -> None:
+    """Set or update the speech prefix setting for a user in the database."""
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute(
+            """
+            INSERT INTO user_prefix_settings (user_id, prefix_enabled) VALUES (?, ?)
+            ON CONFLICT(user_id) DO UPDATE SET prefix_enabled = excluded.prefix_enabled
+            """,
+            (user_id, int(enabled)),
         )
         await db.commit()
