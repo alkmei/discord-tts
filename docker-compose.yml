@@ -19,7 +19,7 @@ services:
     depends_on:
       - rabbitmq
     restart: always
-    command: python bot/main.py
+    command: python -m bot.main
 
   worker:
     image: discord-tts-app:latest

@@ -101,7 +101,7 @@ class ParsedLine:
 
 
 @app.get("/")
-async def index(request: Request) -> templates.TemplateResponse:  # type: ignore[valid-type]
+async def index(request: Request) -> HTMLResponse:
     """Render the main index page."""
     return templates.TemplateResponse("index.html", {"request": request})
 
@@ -152,11 +152,11 @@ def parse_multiline_tts(text: str) -> list[ParsedLine]:
 
 
 @app.post("/generate")
-async def generate(  # type: ignore[valid-type]
+async def generate(
     request: Request,
     text: Annotated[str, Form()],
     guild_id: Annotated[str | None, Form()] = None,
-) -> HTMLResponse | templates.TemplateResponse:  # type: ignore[valid-type]
+) -> HTMLResponse:
     """Generate TTS for the given text."""
     if not text.strip():
         return HTMLResponse('<div class="alert alert-warning">Text is empty.</div>')

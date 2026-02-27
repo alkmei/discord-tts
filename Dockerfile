@@ -1,39 +1,54 @@
-# Use a Python 3.13 image with uv pre-installed
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+# --- Stage 1: Build Stage ---
+FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim AS builder
 
-# Install system dependencies
-# - ffmpeg: Required by discord.py to play audio
-# - build-essential/libffi-dev: Required to compile PyNaCl and other C extensions
-# - git: Required to install pocket-tts from the git source
+ENV UV_COMPILE_BYTECODE=1
+ENV UV_LINK_MODE=copy
+
+WORKDIR /app
+
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     build-essential \
     libffi-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
-WORKDIR /app
+RUN --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --frozen --no-install-project --no-dev
 
-# Enable bytecode compilation for faster startups
-ENV UV_COMPILE_BYTECODE=1
-
-# Copy dependency files first for better layer caching
-COPY pyproject.toml uv.lock ./
-
-# Install dependencies using uv
-# --frozen ensures we use the exact versions in the lockfile
-RUN uv sync --frozen --no-install-project --no-dev --no-cache
-
-# Copy the rest of the application code
 COPY . .
 
-# Create directories for voices and shared audio files
-RUN mkdir -p /app/voices /app/shared
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
-# Set environment variables
-ENV PATH="/app/.venv/bin:$PATH"
+
+# --- Stage 2: Runtime Stage ---
+FROM python:3.13-slim-bookworm AS runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+WORKDIR /app
+
+ENV HF_HOME=/app/.cache/huggingface
 ENV PYTHONUNBUFFERED=1
+ENV PATH="/app/.venv/bin:$PATH"
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "bot/main.py"]
+# Create all necessary directories and give ownership to appuser
+RUN mkdir -p /app/voices /app/shared /app/.cache/huggingface && \
+    chown -R appuser:appuser /app
+
+# Copy the virtual environment and app
+COPY --from=builder --chown=appuser:appuser /app/.venv /app/.venv
+COPY --from=builder --chown=appuser:appuser /app /app
+
+USER appuser
+
+# Entrypoint
+CMD ["python", "main.py"]
