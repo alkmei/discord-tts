@@ -10,7 +10,7 @@ from ..utils.config import get_available_voices
 from ..utils.db import set_user_voice
 
 if TYPE_CHECKING:
-    from discord.ext.commands import Context
+    from discord.ext.commands import Context  # type: ignore[I001]
 
 
 class VoiceCog(commands.Cog):

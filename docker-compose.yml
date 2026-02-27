@@ -8,6 +8,13 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     restart: always
+    # Added healthcheck to verify RabbitMQ is actually ready
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
 
   bot:
     build: .
@@ -15,9 +22,11 @@ services:
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
+      - bot_db:/app/data
     env_file: .env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     restart: always
     command: python -m bot.main
 
@@ -28,9 +37,9 @@ services:
       - shared_data:/app/shared
     env_file: .env
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
     restart: always
-    # If using a GPU, you'll need additional nvidia-docker config here
     command: celery -A worker.tasks worker --loglevel=info --concurrency=1
   
   webui:
@@ -43,7 +52,9 @@ services:
     ports:
       - "8000:8000"
     depends_on:
-      - rabbitmq
+      rabbitmq:
+        condition: service_healthy
 
 volumes:
   shared_data:
+  bot_db:
