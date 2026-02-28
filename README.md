@@ -6,7 +6,17 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 
 - Primarily needs `.safetensors` models generated from Pocket-TTS
 - Automatic TTS for muted users
-- Primary commands: `!voice`, `!s`, `!t`
+- Primary commands: `!voice`, `!s`
+
+## Usage
+
+Pull the docker image using
+
+```sh
+docker pull ghcr.io/alkmei/discord-tts:latest
+```
+
+Use the `docker-compose.yml` as a guide on how to launch the different services.
 
 ## Voice System
 
