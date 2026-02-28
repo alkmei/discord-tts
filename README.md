@@ -59,9 +59,6 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
 - `!s <text>`
   - Speak text directly (no username prefix)
   - Example: `!s Hello world!`
-- `!t <text>`
-  - Speak text with your username prefix (`<username> says: <text>`)
-  - Example: `!t Testing 1 2 3`
 - `!multi`
   - Used for playing dialog from different voices back to back. Example:
 
