@@ -49,12 +49,22 @@ class TTSRequest:
         self.filepath = filepath
 
 
-async def wait_for_task_completion(task: AsyncResult[Any]) -> None:
+async def wait_for_task_completion(request: TTSRequest) -> None:  # <-- Changed parameter
     """Wait for a Celery task to complete using asyncio.Event polling."""
     completion_event: asyncio.Event = asyncio.Event()
 
     async def poll_task() -> None:
-        while not task.ready():  # noqa: ASYNC110
+        # Loop for up to ~300 seconds to prevent infinite hangs if a task fails
+        for _ in range(3000):
+            if request.task.ready():  # Works if the bot sent the task
+                break
+
+            # Fallback for RPC backend when a task originated from the web process
+            if request.filepath.exists():
+                # Allow a small delay to ensure ffmpeg/tts finished writing the file
+                await asyncio.sleep(0.5)
+                break
+
             await asyncio.sleep(0.1)
         completion_event.set()
 
@@ -111,7 +121,7 @@ async def process_queue(guild_id: int) -> None:
             continue
 
         guild: discord.Guild | None = bot.get_guild(guild_id)
-        vc: discord.VoiceClient | None = guild.voice_client if guild else None  # type: ignore[assignment]
+        vc: discord.VoiceClient | None = guild.voice_client if guild else None  # type: ignore[assignment] too lazy to fix this
 
         if not vc:
             currently_playing[guild_id] = None
@@ -119,9 +129,10 @@ async def process_queue(guild_id: int) -> None:
             continue
 
         try:
-            await wait_for_task_completion(request.task)
+            await wait_for_task_completion(request)
 
-            if request.task.state == "FAILURE":
+            # Ensure task is ready before accessing state to avoid unreadiness errors
+            if request.task.ready() and request.task.state == "FAILURE":
                 logger.warning("Celery Task failed: %s", request.task.result)
                 currently_playing[guild_id] = None
                 guild_queues[guild_id].task_done()

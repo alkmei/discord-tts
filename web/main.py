@@ -83,20 +83,23 @@ class ParsedLine:
     voice: str
     text: str
     warnings: list[str]
+    filename: str | None = None
 
     def __init__(self, line_num: int, voice: str, text: str, warnings: list[str]) -> None:
         self.line_num = line_num
         self.voice = voice
         self.text = text
         self.warnings = warnings
+        self.filename = None
 
-    def to_dict(self) -> dict[str, int | str | list[str]]:
+    def to_dict(self) -> dict[str, int | str | list[str] | None]:
         """Convert to dictionary for template rendering."""
         return {
             "line_num": self.line_num,
             "voice": self.voice,
             "text": self.text,
             "warnings": self.warnings,
+            "filename": self.filename,
         }
 
 
@@ -167,6 +170,8 @@ async def generate(
         task_id: str = str(uuid.uuid4())
         filename: str = f"web_{task_id}.wav"
 
+        line_data.filename = filename
+
         celery_app.send_task(
             "worker.tasks.generate_tts_task",
             args=[line_data.text, line_data.voice, filename],
@@ -185,7 +190,7 @@ async def generate(
             await rabbitmq_state.exchange.publish(aio_pika.Message(body=json.dumps(payload).encode()), routing_key="")
 
     # Convert ParsedLine objects to dicts for template
-    parsed_dicts: list[dict[str, int | str | list[str]]] = [line.to_dict() for line in parsed_lines]
+    parsed_dicts: list[dict[str, int | str | list[str] | None]] = [line.to_dict() for line in parsed_lines]
 
     return templates.TemplateResponse(
         "partials/result.html",
