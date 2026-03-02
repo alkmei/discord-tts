@@ -1,5 +1,7 @@
 # discord-tts
 
+This is still unstable! Expect breaking changes on version updates!
+
 A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, high-quality speech generation. Built with Python for cross-platform compatibility.
 
 ## Features
