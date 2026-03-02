@@ -79,10 +79,10 @@ marius: I'm doing good!
 
 ## Running the Bot
 
-- Setup dependencies
+- Make sure docker is installed
 - Add voices to the `voices` directory
 - Configure `.env` (Discord bot token, etc.)
-- Run the bot with Python
+- `docker compose up`
 
 ## WebUI
 
