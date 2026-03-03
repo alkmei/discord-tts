@@ -206,6 +206,9 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
+    if message.content.startswith("http") or message.content.startswith("https"):
+        return
+
     # Auto-TTS logic using SQLite
     bound_channel_id = database.get_bound_channel(message.guild.id)
     if bound_channel_id and message.channel.id == bound_channel_id:
