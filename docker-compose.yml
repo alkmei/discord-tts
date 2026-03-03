@@ -10,6 +10,7 @@ services:
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
+      - ./db:/app/data
     env_file: .env
     depends_on:
       - redis
@@ -21,6 +22,7 @@ services:
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
+      - ./db:/app/data
     env_file: .env
     depends_on:
       - redis
@@ -34,6 +36,7 @@ services:
     volumes:
       - ./voices:/app/voices
       - shared_data:/app/shared
+      - ./db:/app/data
     env_file: .env
     ports:
       - "8000:8000"
