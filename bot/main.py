@@ -8,7 +8,7 @@ import os
 import uuid
 from dotenv import load_dotenv
 import redis.asyncio as aioredis
-import database
+from . import database
 
 load_dotenv()
 
