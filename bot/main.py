@@ -206,7 +206,7 @@ async def on_message(message):
         await bot.process_commands(message)
         return
 
-    if message.content.startswith("http") or message.content.startswith("https"):
+    if message.content.startswith("http"):
         return
 
     # Auto-TTS logic using SQLite
