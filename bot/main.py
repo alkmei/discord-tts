@@ -398,48 +398,6 @@ async def voices(ctx):
     await ctx.send(f"**Available Voices:** \n```\n{'\n'.join(available)}\n```")
 
 
-@bot.command()
-async def help(ctx):
-    """Shows this help message."""
-    embed = discord.Embed(title="TTS Bot Help", color=discord.Color.blue())
-    embed.add_field(
-        name="!join",
-        value="Joins your VC and binds to the current text channel.",
-        inline=False,
-    )
-    embed.add_field(
-        name="!voice <name>", value="Changes your personal voice (saved).", inline=True
-    )
-    embed.add_field(name="!voices", value="Lists all available voices.", inline=True)
-    embed.add_field(
-        name="!prefix <on/off>",
-        value="Toggle if I say 'Name says:' before auto-TTS.",
-        inline=False,
-    )
-    embed.add_field(
-        name="!t <text>",
-        value="Speak a specific message with your name prepended.",
-        inline=False,
-    )
-    embed.add_field(
-        name="!s <text>",
-        value="Speak a message without any name prepended.",
-        inline=False,
-    )
-    embed.add_field(
-        name="!multi <lines>",
-        value="Multi-line TTS. Use `voicename: text` per line.",
-        inline=False,
-    )
-    embed.add_field(
-        name="!queue", value="Show current generation and playback queue.", inline=True
-    )
-    embed.add_field(
-        name="!stop", value="Clears the queue and stops audio.", inline=True
-    )
-    await ctx.send(embed=embed)
-
-
 if __name__ == "__main__":
     if not TOKEN:
         print("Error: DISCORD_BOT_TOKEN not set in environment variables.")
