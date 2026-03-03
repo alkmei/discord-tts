@@ -8,6 +8,7 @@ import os
 import uuid
 from dotenv import load_dotenv
 import redis.asyncio as aioredis
+import database
 
 load_dotenv()
 
@@ -30,8 +31,6 @@ intents.members = True
 bot = commands.Bot(command_prefix=PREFIX, intents=intents)
 
 # --- State ---
-user_voice_selections = {}  # UserID -> Voice Name
-bound_channels = {}  # GuildID -> ChannelID
 guild_queues = {}  # GuildID -> asyncio.Queue (stores TTSRequest references)
 processing_tasks = {}  # GuildID -> Task (the background loop)
 currently_playing = {}  # GuildID -> TTSRequest (the one currently being voiced)
@@ -193,40 +192,43 @@ async def listen_for_web_requests():
 
 @bot.event
 async def on_ready():
+    if not bot.user:
+        print("Error: Bot user not found.")
+        return
+    database.init_db()  # Initialize SQLite
     print(f"Logged in as {bot.user.name}")
     bot.loop.create_task(listen_for_web_requests())
 
 
 @bot.event
 async def on_message(message):
-    if message.author.bot:
-        return
-    await bot.process_commands(message)
-    if message.content.startswith(PREFIX):
+    if message.author.bot or message.content.startswith(PREFIX):
+        await bot.process_commands(message)
         return
 
-    if message.content.startswith("https://") or message.content.startswith("http://"):
-        return
+    # Auto-TTS logic using SQLite
+    bound_channel_id = database.get_bound_channel(message.guild.id)
+    if bound_channel_id and message.channel.id == bound_channel_id:
+        if message.author.voice and message.author.voice.channel:
+            vc = message.guild.voice_client
+            if vc and vc.channel == message.author.voice.channel:
+                if message.author.voice.self_mute or message.author.voice.mute:
+                    # Fetch persistent user settings
+                    settings = database.get_user_settings(message.author.id)
 
-    # Auto-TTS logic
-    if message.guild and message.guild.id in bound_channels:
-        if message.channel.id == bound_channels[message.guild.id]:
-            if message.author.voice and message.author.voice.channel:
-                vc = message.guild.voice_client
-                if vc and vc.channel == message.author.voice.channel:
-                    if message.author.voice.self_mute or message.author.voice.mute:
-                        voice_name = user_voice_selections.get(
-                            message.author.id, "alba"
-                        )
+                    if settings["use_prefix"]:
                         text_to_say = (
                             f"{message.author.display_name} says: {message.content}"
                         )
-                        await add_to_tts_queue(
-                            message.guild.id,
-                            message.author.display_name,
-                            text_to_say,
-                            voice_name,
-                        )
+                    else:
+                        text_to_say = message.content
+
+                    await add_to_tts_queue(
+                        message.guild.id,
+                        message.author.display_name,
+                        text_to_say,
+                        settings["voice"],
+                    )
 
 
 # --- Commands ---
@@ -234,6 +236,7 @@ async def on_message(message):
 
 @bot.command()
 async def join(ctx):
+    """Joins your voice channel and binds to the text channel."""
     if not ctx.author.voice:
         return await ctx.send("You are not in a voice channel.")
 
@@ -243,8 +246,34 @@ async def join(ctx):
     else:
         await channel.connect()
 
-    bound_channels[ctx.guild.id] = ctx.channel.id
+    database.set_bound_channel(ctx.guild.id, ctx.channel.id)
     await ctx.send(f"Joined **{channel.name}** and bound to this text channel.")
+
+
+@bot.command()
+async def voice(ctx, name: str):
+    """Sets your personal TTS voice."""
+    available = get_available_voices()
+    name = name.lower()
+    if name not in available:
+        return await ctx.send(f"❌ Voice `{name}` not found.")
+
+    database.set_user_voice(ctx.author.id, name)
+    await ctx.send(f"✅ Your voice is now **{name}**")
+
+
+@bot.command()
+async def prefix(ctx, setting: str):
+    """Toggle the 'User says:' prefix (on/off)."""
+    setting = setting.lower()
+    if setting in ["on", "yes", "true"]:
+        database.set_user_prefix(ctx.author.id, True)
+        await ctx.send("✅ Prefix enabled: I will say your name before the message.")
+    elif setting in ["off", "no", "false"]:
+        database.set_user_prefix(ctx.author.id, False)
+        await ctx.send("✅ Prefix disabled: I will only say the message content.")
+    else:
+        await ctx.send("Usage: `!prefix on` or `!prefix off`")
 
 
 @bot.command()
@@ -266,7 +295,7 @@ async def queue(ctx):
 
     lines = ["**TTS Queue**"]
 
-    # 1. Currently Playing section
+    # Currently Playing section
     if current:
         status = "🔊 Playing" if current.task.ready() else "⚙️ Generating"
         # Truncate text to 50 chars to prevent hitting message limits
@@ -275,7 +304,7 @@ async def queue(ctx):
         )
         lines.append(f"__Now:__ **{current.user_name}** ({status}): {text_preview}")
 
-    # 2. Up Next section
+    # Up Next section
     if queue_list:
         lines.append("\n__Up Next:__")
         for i, req in enumerate(queue_list[:10], 1):  # Show max 10 items
@@ -294,50 +323,51 @@ async def queue(ctx):
 
 
 @bot.command()
-async def t(ctx, *, text: str):
-    if not ctx.voice_client:
-        return await ctx.send("Use `!join` first.")
-
-    voice_name = user_voice_selections.get(ctx.author.id, "alba")
-    text_to_say = f"{ctx.author.display_name} says: {text}"
-    await add_to_tts_queue(
-        ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
-    )
-
-
-@bot.command()
 async def s(ctx, *, text: str):
+    """Speaks the text directly (no 'User says:' prefix) using your saved voice."""
     if not ctx.voice_client:
         return await ctx.send("Use `!join` first.")
 
-    voice_name = user_voice_selections.get(ctx.author.id, "alba")
+    # Fetch persistent voice setting from DB
+    settings = database.get_user_settings(ctx.author.id)
+    voice_name = settings["voice"]
+
+    # We skip the prefix logic here because !s is intended for direct speech
     await add_to_tts_queue(ctx.guild.id, ctx.author.display_name, text, voice_name)
 
 
 @bot.command()
 async def multi(ctx, *, text: str):
+    """Speaks multiple lines. Supports 'voice: text' per line."""
     if not ctx.voice_client:
         return await ctx.send("Use `!join` first.")
 
-    # For each line, if it starts with valid_voice:, use that voice for the line
+    # Pre-fetch data needed for the loop
+    available_voices = get_available_voices()
+    settings = database.get_user_settings(ctx.author.id)
+    default_voice = settings["voice"]
+
     lines = text.splitlines()
     for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        voice_to_use = default_voice
+        text_to_say = line
+
+        # Check if the line specifies a custom voice (e.g., "bella: hello there")
         if ":" in line:
             potential_voice, actual_text = line.split(":", 1)
             potential_voice = potential_voice.strip().lower()
-            if potential_voice in get_available_voices():
-                voice_name = potential_voice
-                text_to_say = f"{actual_text.strip()}"
-                await add_to_tts_queue(
-                    ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
-                )
-                continue
 
-        # If no valid voice prefix, use default
-        voice_name = user_voice_selections.get(ctx.author.id, "alba")
-        text_to_say = f"{line.strip()}"
+            if potential_voice in available_voices:
+                voice_to_use = potential_voice
+                text_to_say = actual_text.strip()
+
+        # Add each line to the queue
         await add_to_tts_queue(
-            ctx.guild.id, ctx.author.display_name, text_to_say, voice_name
+            ctx.guild.id, ctx.author.display_name, text_to_say, voice_to_use
         )
 
 
@@ -361,19 +391,6 @@ async def stop(ctx):
 
 
 @bot.command()
-async def voice(ctx, name: str):
-    available = get_available_voices()
-    name = name.lower()
-    if name not in available:
-        return await ctx.send(
-            f"❌ Voice `{name}` not found. Available: {', '.join(available)}"
-        )
-
-    user_voice_selections[ctx.author.id] = name
-    await ctx.send(f"✅ Voice set to **{name}**")
-
-
-@bot.command()
 async def voices(ctx):
     available = get_available_voices()
     if not available:
@@ -381,5 +398,50 @@ async def voices(ctx):
     await ctx.send(f"**Available Voices:** \n```\n{'\n'.join(available)}\n```")
 
 
+@bot.command()
+async def help(ctx):
+    """Shows this help message."""
+    embed = discord.Embed(title="TTS Bot Help", color=discord.Color.blue())
+    embed.add_field(
+        name="!join",
+        value="Joins your VC and binds to the current text channel.",
+        inline=False,
+    )
+    embed.add_field(
+        name="!voice <name>", value="Changes your personal voice (saved).", inline=True
+    )
+    embed.add_field(name="!voices", value="Lists all available voices.", inline=True)
+    embed.add_field(
+        name="!prefix <on/off>",
+        value="Toggle if I say 'Name says:' before auto-TTS.",
+        inline=False,
+    )
+    embed.add_field(
+        name="!t <text>",
+        value="Speak a specific message with your name prepended.",
+        inline=False,
+    )
+    embed.add_field(
+        name="!s <text>",
+        value="Speak a message without any name prepended.",
+        inline=False,
+    )
+    embed.add_field(
+        name="!multi <lines>",
+        value="Multi-line TTS. Use `voicename: text` per line.",
+        inline=False,
+    )
+    embed.add_field(
+        name="!queue", value="Show current generation and playback queue.", inline=True
+    )
+    embed.add_field(
+        name="!stop", value="Clears the queue and stops audio.", inline=True
+    )
+    await ctx.send(embed=embed)
+
+
 if __name__ == "__main__":
-    bot.run(TOKEN)
+    if not TOKEN:
+        print("Error: DISCORD_BOT_TOKEN not set in environment variables.")
+    else:
+        bot.run(TOKEN)
