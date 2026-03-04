@@ -8,7 +8,19 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 
 - Primarily needs `.safetensors` models generated from Pocket-TTS
 - Automatic TTS for muted users
-- Primary commands: `!voice`, `!s`, `!t`
+
+## Running the Bot
+
+### Linux/WSL
+
+- Make sure docker is installed
+- Add voices to the `voices` directory
+- Configure `.env` (Discord bot token, etc.)
+- `docker compose up`
+
+### Windows
+
+[Download WSL2](https://learn.microsoft.com/en-us/windows/wsl/install), then follow the instructions above.
 
 ## Voice System
 
@@ -61,9 +73,8 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
 - `!s <text>`
   - Speak text directly (no username prefix)
   - Example: `!s Hello world!`
-- `!t <text>`
-  - Speak text with your username prefix (`<username> says: <text>`)
-  - Example: `!t Testing 1 2 3`
+- `!prefix <on|off>`
+  - Toggle the 'User says:' prefix (on/off).
 - `!multi`
   - Used for playing dialog from different voices back to back. Example:
 
@@ -76,13 +87,6 @@ marius: I'm doing good!
 > Depends on having `alba.safetensors` and `marius.safetensors` inside the `voices` directory.
 
 - **Automatic TTS:** Muted user’s text messages are spoken aloud in voice channels.
-
-## Running the Bot
-
-- Make sure docker is installed
-- Add voices to the `voices` directory
-- Configure `.env` (Discord bot token, etc.)
-- `docker compose up`
 
 ## WebUI
 
