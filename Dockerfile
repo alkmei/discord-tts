@@ -1,31 +1,44 @@
-# Use a Python 3.13 image with uv pre-installed
-FROM ghcr.io/astral-sh/uv:python3.13-bookworm-slim
+# ==========================================
+# Stage 1: Builder
+# ==========================================
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim AS builder
 
-# Install system dependencies
-# - ffmpeg: Required by discord.py to play audio
-# - build-essential/libffi-dev: Required to compile PyNaCl and other C extensions
-# - git: Required to install pocket-tts from the git source
+# Install build dependencies
+# - build-essential/libffi-dev: Required to compile PyNaCl and C extensions
+# - git: Required to install pocket-tts from git
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    ffmpeg \
     build-essential \
     libffi-dev \
     git \
     && rm -rf /var/lib/apt/lists/*
 
-# Set the working directory
 WORKDIR /app
 
-# Enable bytecode compilation for faster startups
 ENV UV_COMPILE_BYTECODE=1
 
-# Copy dependency files first for better layer caching
+# Copy dependency files first for layer caching
 COPY pyproject.toml uv.lock ./
 
-# Install dependencies using uv
-# --frozen ensures we use the exact versions in the lockfile
+# Install dependencies into the virtual environment
 RUN uv sync --frozen --no-install-project --no-dev --no-cache
 
-# Copy the rest of the application code
+# ==========================================
+# Stage 2: Runtime
+# ==========================================
+FROM ghcr.io/astral-sh/uv:python3.14-trixie-slim
+
+# Install strict runtime dependencies
+# - ffmpeg: Required by discord.py to process/play audio
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy only the compiled virtual environment from the builder
+COPY --from=builder /app/.venv /app/.venv
+
+# Copy the application code
 COPY . .
 
 # Create directories for voices and shared audio files
@@ -35,5 +48,5 @@ RUN mkdir -p /app/voices /app/shared
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONUNBUFFERED=1
 
-# Default command (can be overridden in docker-compose)
-CMD ["python", "bot/main.py"]
+# Default command
+CMD ["python", "-m", "bot.main"]
