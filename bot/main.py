@@ -359,6 +359,41 @@ async def s(ctx, *, text: str):
 
 
 @bot.command()
+async def multi(ctx, *, text: str):
+    """Speaks multiple lines. Supports 'voice: text' per line."""
+    if not ctx.voice_client:
+        return await ctx.send("Use `!join` first.")
+
+    # Pre-fetch data needed for the loop
+    available_voices = get_available_voices()
+    settings = database.get_user_settings(ctx.author.id)
+    default_voice = settings["voice"]
+
+    lines = text.splitlines()
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        voice_to_use = default_voice
+        text_to_say = line
+
+        # Check if the line specifies a custom voice (e.g., "bella: hello there")
+        if ":" in line:
+            potential_voice, actual_text = line.split(":", 1)
+            potential_voice = potential_voice.strip().lower()
+
+            if potential_voice in available_voices:
+                voice_to_use = potential_voice
+                text_to_say = actual_text.strip()
+
+        # Add each line to the queue
+        await add_to_tts_queue(
+            ctx.guild.id, ctx.author.display_name, text_to_say, voice_to_use
+        )
+
+
+@bot.command()
 async def stop(ctx):
     """Stops playback and clears the local and Celery queue."""
     if ctx.voice_client:
