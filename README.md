@@ -104,7 +104,7 @@ Note that it doesn't have any protection, so be cautious when deploying it publi
 
 Contributions welcome! Please:
 
-- Suggest new features (including Windows-compatible export workflows)
+- Suggest new features
 - Submit bug reports and pull requests
 - Help extend functionality (such as adding a voice listing command)
 
