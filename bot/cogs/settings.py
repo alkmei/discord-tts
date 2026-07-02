@@ -24,7 +24,7 @@ class SettingsModal(ui.Modal, title="TTS Preferences"):
         text="Introduce speaker",
         description="Select whether you want the bot to introduce you"
         " (<name> says: [text]).",
-        # Should get existing user preference as default
+        # TODO: Should get existing user preference as default
         component=ui.Checkbox(default=False),
     )
 
