@@ -25,15 +25,22 @@ class TTSBot(commands.Bot):
     """TTSBot entry point."""
 
     def __init__(self) -> None:
+        self.EXTENSIONS: list[str] = [
+            "bot.cogs.voice",
+            "bot.cogs.tts",
+            "bot.cogs.settings",
+        ]
         intents = discord.Intents.default()
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self) -> None:
-        """Load cogs."""
-        for filename in os.listdir("./cogs"):
-            if filename.endswith(".py"):
-                await self.load_extension(f"cogs.{filename[:-3]}")
-                logger.info("Loaded cog", extra={"cog": filename})
+        """Manually load the defined extensions."""
+        for extension in self.EXTENSIONS:
+            try:
+                await self.load_extension(extension)
+                logger.info("Successfully loaded extension: %s", extension)
+            except commands.ExtensionError:
+                logger.exception("Failed to load extension: %s", extension)
 
     async def on_ready(self) -> None:
         """Sync slash commands."""

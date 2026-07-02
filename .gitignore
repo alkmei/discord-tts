@@ -18,3 +18,5 @@ output
 temp_processing
 *.wav
 db
+
+*.log
