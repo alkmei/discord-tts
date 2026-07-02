@@ -1,4 +1,11 @@
 {
-    "python.analysis.typeCheckingMode": "basic",
-    "mypy.enabled": false
+    "python.analysis.typeCheckingMode": "strict",
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "charliermarsh.ruff",
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+        }
+    },
 }

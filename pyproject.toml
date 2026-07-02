@@ -29,3 +29,16 @@ torch = [{ index = "pytorch-cpu" }]
 name = "pytorch-cpu"
 url = "https://download.pytorch.org/whl/cpu"
 explicit = true
+
+[tool.ruff]
+line-length = 88
+target-version = "py314"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = ["D100", "D103", "D107"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["discord_tts"]
+combine-as-imports = true
+split-on-trailing-comma = false
