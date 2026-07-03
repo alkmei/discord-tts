@@ -29,7 +29,7 @@ class SettingsModal(ui.Modal, title="TTS Preferences"):
     )
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
-        """Apply settings to user in KV database."""
+        """Apply settings to user in database."""
 
 
 class SettingsCog(commands.Cog):
