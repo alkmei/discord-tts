@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 
 
-class DiscordUserProfile(models.Model):
+class UserPreferences(models.Model):
     discord_id = models.BigAutoField(primary_key=True)
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
