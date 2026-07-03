@@ -77,7 +77,7 @@ class SettingsCog(commands.Cog):
         """Adjust TTS preferences."""
         if not voice and not introduce_speaker:
             await interaction.response.send_message(
-                "You gotta specify some settings...",
+                "You didn't change anything...",
                 ephemeral=True,
             )
             return
