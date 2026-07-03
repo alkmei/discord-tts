@@ -2,28 +2,10 @@ import os
 from functools import lru_cache
 
 import scipy.io.wavfile
-from celery import Celery
-from pocket_tts import TTSModel
+from celery import shared_task
+from django.conf import settings
 
-# Initialize Celery
-app = Celery(
-    "tts_worker",
-    broker=os.getenv("REDIS_URL"),
-    backend=os.getenv("REDIS_URL"),
-)
-
-# Global model variable (loaded once when worker starts)
-tts_model = None
-
-
-def get_model():
-    """Singleton to load the base model only once."""
-    global tts_model
-    if tts_model is None:
-        print("⏳ Worker: Loading Base Pocket TTS Model...")
-        tts_model = TTSModel.load_model()
-        print(f"✅ Worker: Model loaded on {tts_model.device}")
-    return tts_model
+from .tts_model import get_model
 
 
 @lru_cache(maxsize=4)
@@ -33,7 +15,7 @@ def get_cached_voice_state(voice_name):
     Keeps only the last 4 used voices in memory.
     """
     model = get_model()
-    voices_dir = "/app/voices"
+    voices_dir = settings.TTS_SHARED_DIR
 
     # Try safetensors first, then wav
     safe_path = os.path.join(voices_dir, f"{voice_name}.safetensors")
@@ -54,7 +36,7 @@ def get_cached_voice_state(voice_name):
     return model.get_state_for_audio_prompt("alba")  # internal default
 
 
-@app.task
+@shared_task
 def generate_tts_task(text, voice_name, output_filename):
     """
     Celery Task: Generates audio and saves to shared volume.

@@ -5,7 +5,7 @@ from celery import shared_task
 from django.core.files.base import ContentFile
 from pocket_tts import export_model_state
 
-from worker.tasks import get_model
+from worker.tts_model import get_model
 
 from .models import Voice
 
