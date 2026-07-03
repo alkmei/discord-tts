@@ -1,9 +1,8 @@
 from typing import TypedDict
 
-from django.db import models
 from django.db import transaction
 
-from apps.voices.models import Voice
+from apps.voices.interface import get_voice
 
 from .models import UserPreferences
 
@@ -34,10 +33,7 @@ def update_user_preferences(
 
             voice_id = data.get("voice_id")
             if voice_id is not None:
-                voice = Voice.objects.filter(
-                    models.Q(guild_id=guild_id) | models.Q(guild_id=0),
-                    pk=voice_id,
-                ).first()
+                voice = get_voice(guild_id, voice_id).first()
 
                 if not voice:
                     return False, f"Voice {voice_id} is not available in this server."
