@@ -12,7 +12,7 @@ if typing.TYPE_CHECKING:
 class Voice(models.Model):
     name = models.CharField(max_length=32)
     guild_id = models.PositiveBigIntegerField()
-    audio_source = models.FileField(upload_to="raw-voices/")
+    audio_source = models.FileField(upload_to="raw-voices/", null=True)
     processed_safetensor = models.FileField(upload_to="voices/", null=True, blank=True)
 
     objects: Manager[Voice] = models.Manager()
