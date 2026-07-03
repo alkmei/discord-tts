@@ -16,3 +16,10 @@ class Voice(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    def regenerate_safetensors(self):
+        from .tasks import generate_safetensors  # noqa: PLC0415
+
+        if self.audio_source:
+            audio_path = self.audio_source.path
+            generate_safetensors.delay(self.pk, audio_path)
