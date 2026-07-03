@@ -1,6 +1,9 @@
+import logging
 import typing
 
 from django.db import models
+
+logger = logging.getLogger(__name__)
 
 if typing.TYPE_CHECKING:
     from django.db.models.manager import Manager
@@ -22,4 +25,10 @@ class Voice(models.Model):
 
         if self.audio_source:
             audio_path = self.audio_source.path
+            logger.info(
+                "Regenerating safetensor for voice '%s' (id=%s, audio=%s)",
+                self.name,
+                self.pk,
+                audio_path,
+            )
             generate_safetensors.delay(self.pk, audio_path)
