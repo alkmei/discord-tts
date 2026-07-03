@@ -44,7 +44,26 @@ def update_user_preferences(
                 prefs.introduce_speaker = intro
 
             prefs.save()
-            return True, "Success"
+
+            voice_part = (
+                f"Updated voice to `{prefs.voice.name}`"
+                if prefs.voice and voice_id is not None
+                else None
+            )
+            intro_part = (
+                "Will now introduce you"
+                if intro
+                else "Will no longer introduce you"
+                if intro is not None
+                else None
+            )
+            if voice_part is None and intro_part is None:
+                return True, "No changes made."
+            if intro_part and voice_part:
+                return True, f"{voice_part} and {intro_part.lower()}."
+            if voice_part:
+                return True, f"{voice_part}."
+            return True, f"{intro_part}."
 
     except Exception as e:
         return False, str(e)
