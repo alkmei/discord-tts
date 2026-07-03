@@ -38,9 +38,11 @@ def clean_tts_text(message: discord.Message) -> str:
     # We replace underscores with spaces and remove colons for cleaner TTS
     content = emoji.demojize(content, delimiters=(" ", " "))
     content = content.replace("_", " ").replace(":", "")
+    content = " ".join(content.split())
 
-    # Final cleanup of whitespace
-    return " ".join(content.split())
+    # Pocket-TTS use to have this bug that cut the first part of a message off.
+    # Adding a period was a failsafe, but not sure if that's still needed.
+    return "." + content
 
 
 class TTSCog(commands.Cog):
@@ -57,7 +59,7 @@ class TTSCog(commands.Cog):
         voice: str,
         text: str,
     ) -> None:
-        """Give bot a message to say."""
+        """Explicitly give bot a message."""
 
     @app_commands.command(name="stop", description="Stop playback")
     async def stop(self, interaction: discord.Interaction) -> None:
@@ -66,3 +68,7 @@ class TTSCog(commands.Cog):
     @app_commands.command(name="skip", description="Skip current voice line")
     async def skip(self, interaction: discord.Interaction) -> None:
         """Skip the current or next message queued to play for channel."""
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message):
+        """Detect messages from muted people in the bound channels."""
