@@ -1,8 +1,32 @@
 import asyncio
+import contextlib
+import json
+import os
+from typing import TYPE_CHECKING
+from typing import Any
+from typing import TypedDict
 
 import discord
-import redis
+import redis.asyncio as aioredis
 from discord.ext import commands
+from discord.voice_client import VoiceClient
+
+from bot.logging import setup_logging
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+
+logger = setup_logging()
+
+QUEUE_RECONNECT_TIMEOUT = 300  # 5 minutes
+
+
+class RedisMessage(TypedDict):
+    type: str
+    pattern: Any
+    channel: str
+    data: str | bytes
 
 
 class SpeakerCog(commands.Cog):
@@ -11,30 +35,36 @@ class SpeakerCog(commands.Cog):
     Listens for signals from TTS workers to see when the audio clip is ready
     """
 
-    def __init__(self, bot: commands.Bot):
+    def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
-        self.redis_url = "redis://localhost"
+        self.redis_url = os.getenv("REDIS_URL") or "redis://localhost"
         # Stores a queue for every guild: {guild_id: asyncio.Queue}
-        self.queues = {}
+        self.queues: dict[int, asyncio.Queue[dict[str, Any]]] = {}
         # Tracks which guilds are currently playing audio
-        self.playing_tasks = {}
+        self.playing_tasks: dict[int, asyncio.Task[None]] = {}
 
-    async def cog_load(self):
+    async def cog_load(self) -> None:
         """Start the Redis listener with the cog."""
         self.bot.loop.create_task(self.redis_listener())
 
-    async def redis_listener(self):
+    async def redis_listener(self) -> None:
         """Listen for signals from the worker."""
-        r = redis.from_url(self.redis_url)
+        r = aioredis.from_url(self.redis_url)
         pubsub = r.pubsub()
         await pubsub.subscribe("tts_play_queue")
 
-        async for message in pubsub.listen():
+        listener: AsyncIterator[RedisMessage] = pubsub.listen()
+
+        async for message in listener:
             if message["type"] == "message":
-                data = json.loads(message["data"])
+                raw_data = message["data"]
+                if isinstance(raw_data, (bytes, str)):
+                    data: dict[str, Any] = json.loads(raw_data)
+                else:
+                    continue
                 await self.enqueue_audio(data)
 
-    async def enqueue_audio(self, data):
+    async def enqueue_audio(self, data: dict[str, Any]) -> None:
         """Adds a new audio file to the guild's specific queue."""
         guild_id = int(data["guild_id"])
 
@@ -49,9 +79,10 @@ class SpeakerCog(commands.Cog):
                 self.play_loop(guild_id),
             )
 
-    # TODO: The bot needs to have fair scheduling across multiple queues
-    async def play_loop(self, guild_id):
+    async def play_loop(self, guild_id: int) -> None:
         """Continuously plays audio from the queue until it's empty."""
+        # TODO: The bot needs to have fair scheduling across multiple queues.
+        # Consider implementing a round-robin or weighted fair queue scheduler.
         queue = self.queues[guild_id]
 
         while not queue.empty():
@@ -61,34 +92,69 @@ class SpeakerCog(commands.Cog):
 
             await self.execute_play(guild_id, channel_id, file_path)
 
-    async def execute_play(self, guild_id, channel_id, file_path):
+    async def execute_play(
+        self,
+        guild_id: int,
+        channel_id: int,
+        file_path: str,
+    ) -> None:
         """Handles the actual Discord voice playback."""
         guild = self.bot.get_guild(guild_id)
         if not guild:
             return
 
-        # Logic to find or connect to voice channel
         vc = guild.voice_client
-        # Bot should already be in vc?
-        # if not vc:
-        #     channel = self.bot.get_channel(channel_id)
-        #     vc = await channel.connect()
+        if not vc:
+            channel = self.bot.get_channel(channel_id)
+            if channel is None:
+                return
+
+            # Pause the queue for 5 minutes to allow bot reconnection
+            paused_event = asyncio.Event()
+            reconnect_task = self.bot.loop.create_task(
+                self._wait_reconnect(guild, paused_event),
+            )
+
+            # Wait for reconnection or timeout
+            try:
+                await asyncio.wait_for(
+                    paused_event.wait(),
+                    timeout=QUEUE_RECONNECT_TIMEOUT,
+                )
+                reconnect_task.cancel()
+            except TimeoutError:
+                # Timeout expired, clear queue and exit
+                with contextlib.suppress(KeyError):
+                    while not self.queues[guild_id].empty():
+                        self.queues[guild_id].get_nowait()
+                return
+
+            vc = guild.voice_client
+
+            if not isinstance(vc, VoiceClient) or not vc.is_connected():
+                return
 
         # Play audio and wait for it to finish
-        if vc and not vc.is_playing():
-            # We use a Future to 'wait' until the audio is done playing
+        if isinstance(vc, VoiceClient) and not vc.is_playing():
             done = asyncio.Event()
 
-            def after_playing(error):
+            def after_playing(error: Exception | None) -> None:
                 if error:
-                    print(f"Player error: {error}")
-                # Signal that we are ready for the next file
+                    logger.error("Player error", extra={"error": error})
                 self.bot.loop.call_soon_threadsafe(done.set)
 
             vc.play(discord.FFmpegPCMAudio(file_path), after=after_playing)
 
-            # Wait here until the 'after' callback triggers
             await done.wait()
+
+    async def _wait_reconnect(self, guild: discord.Guild, event: asyncio.Event) -> None:
+        """Wait for the bot to reconnect to the voice channel."""
+        while not event.is_set():
+            vc = guild.voice_client
+            if isinstance(vc, VoiceClient) and vc.is_connected():
+                event.set()
+                return
+            await asyncio.sleep(10)
 
 
 async def setup(bot: commands.Bot):
