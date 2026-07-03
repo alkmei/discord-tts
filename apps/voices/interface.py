@@ -10,10 +10,7 @@ def get_available_voices(guild_id: int):
     """
     return list(
         Voice.objects.filter(
-            guild_id=guild_id,
-        )
-        | Voice.objects.filter(
-            guild_id=0,
+            models.Q(guild_id=guild_id) | models.Q(guild_id=0),
         ),
     )
 
@@ -26,4 +23,4 @@ def get_voice(guild_id: int, voice_pk: int):
     return Voice.objects.filter(
         models.Q(guild_id=guild_id) | models.Q(guild_id=0),
         pk=voice_pk,
-    )
+    ).first()

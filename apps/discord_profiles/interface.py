@@ -33,7 +33,7 @@ def update_user_preferences(
 
             voice_id = data.get("voice_id")
             if voice_id is not None:
-                voice = get_voice(guild_id, voice_id).first()
+                voice = get_voice(guild_id, voice_id)
 
                 if not voice:
                     return False, f"Voice {voice_id} is not available in this server."

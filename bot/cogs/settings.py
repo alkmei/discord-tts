@@ -6,6 +6,7 @@ from discord.ext import commands
 from apps.discord_profiles.interface import UserPreferenceUpdateData
 from apps.discord_profiles.interface import update_user_preferences
 from apps.voices.interface import get_available_voices
+from apps.voices.interface import get_voice
 
 
 async def voice_autocomplete(
@@ -16,12 +17,18 @@ async def voice_autocomplete(
         e = "guild_id should not be None"
         raise ValueError(e)
     voices = await sync_to_async(get_available_voices)(interaction.guild_id)
-    return [app_commands.Choice(name=v.name, value=v.name) for v in voices]
+    return [
+        app_commands.Choice(
+            name=f"{v.name} (System)" if v.guild_id == 0 else v.name,
+            value=v.pk,
+        )
+        for v in voices
+    ]
 
 
 async def update_preferences(
     interaction: discord.Interaction,
-    voice: str | None,
+    voice: int | None,
     introduce_speaker: int | None,
 ) -> tuple[bool, str]:
     if not interaction.user.id or not interaction.guild_id:
@@ -34,8 +41,7 @@ async def update_preferences(
     data: UserPreferenceUpdateData = {}
 
     if voice is not None:
-        voices = await sync_to_async(get_available_voices)(guild_id)
-        matched_voice = next((v for v in voices if v.name == voice), None)
+        matched_voice = await sync_to_async(get_voice)(guild_id, voice)
         if not matched_voice:
             return False, f"Voice '{voice}' not found."
         data["voice_id"] = matched_voice.pk
@@ -71,7 +77,7 @@ class SettingsCog(commands.Cog):
     async def settings(
         self,
         interaction: discord.Interaction,
-        voice: str | None = None,
+        voice: int | None = None,
         introduce_speaker: int | None = None,
     ) -> None:
         """Adjust TTS preferences."""
