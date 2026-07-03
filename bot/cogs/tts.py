@@ -90,6 +90,8 @@ class TTSCog(commands.Cog):
         )
         await interaction.response.send_message("Talking...", ephemeral=True)
 
+    # TODO: This might not work if bulk messages are sent, as every message in the
+    # bundle will have the same priority
     async def start_tts_task(
         self,
         guild_id: int,
