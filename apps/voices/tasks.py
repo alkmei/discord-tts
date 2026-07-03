@@ -23,7 +23,7 @@ def generate_safetensors(voice_id: int, audio_path: str):
     model = get_model()
     model_state_for_voice = model.get_state_for_audio_prompt(audio_path)
 
-    safetensor_path = Path(audio_path).parent / f"{voice.name}_processed.safetensors"
+    safetensor_path = Path(audio_path).parent / f"{voice.name}_{voice_id}.safetensors"
     export_model_state(model_state_for_voice, str(safetensor_path))
 
     with Path(safetensor_path).open("rb") as f:

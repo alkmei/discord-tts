@@ -24,23 +24,12 @@ class VoiceAdmin(admin.ModelAdmin):
     list_display = (
         "name",
         "guild_id",
-        "audio_source_link",
+        "audio_source",
         "processed_safetensor",
     )
     list_filter = ("guild_id",)
     search_fields = ("name",)
     actions = ["regenerate_safetensors"]
-
-    @admin.display(
-        description="Audio Source",
-    )
-    def audio_source_link(self, voice: Voice) -> str:
-        if voice.audio_source:
-            return format_html(
-                '<a href="{}" target="_blank">Download</a>',
-                voice.audio_source.url,
-            )
-        return "—"
 
     @admin.action(description="Regenerate safetensor for selected voice(s)")
     def regenerate_safetensors(self, request, queryset):
