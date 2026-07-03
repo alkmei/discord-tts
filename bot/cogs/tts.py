@@ -1,10 +1,12 @@
 import re
+from typing import cast
 
 import discord
 import emoji
 from discord import app_commands
 from discord.ext import commands
 
+from bot.cogs.speaker import SpeakerCog
 from bot.util import voice_autocomplete
 from worker.tasks import generate_tts_task
 
@@ -80,17 +82,40 @@ class TTSCog(commands.Cog):
             )
             return
 
-        cleaned = clean_tts_text(text, interaction.guild)
-
-        voice_pk = voice or 1
-        generate_tts_task.delay(
-            cleaned,
-            voice_pk,
+        await self.start_tts_task(
             interaction.guild_id,
             interaction.channel_id,
+            text,
+            voice,
+        )
+        await interaction.response.send_message("Talking...", ephemeral=True)
+
+    async def start_tts_task(
+        self,
+        guild_id: int,
+        channel_id: int,
+        text: str,
+        voice: int | None,
+    ) -> None:
+        cleaned = clean_tts_text(text, self.bot.get_guild(guild_id))
+
+        speaker_cog = cast("SpeakerCog", self.bot.get_cog("SpeakerCog"))
+        guild_in_progress = (
+            speaker_cog
+            and guild_id in speaker_cog.playing_tasks
+            and not speaker_cog.playing_tasks[guild_id].done()
+        )
+        priority = 1 if guild_in_progress else 9
+
+        voice_pk = voice or 1
+        generate_tts_task.apply_async(
+            args=(cleaned, voice_pk, guild_id, channel_id),
+            priority=priority,
         )
 
-        await interaction.response.send_message("Talking...")
+    @app_commands.command(name="multi", description="Play multiple voicelines")
+    async def multi(self, interaction: discord.Interaction):
+        """Plays multiple lines with multiple voices"""
 
     @app_commands.command(name="stop", description="Stop playback")
     async def stop(self, interaction: discord.Interaction) -> None:
