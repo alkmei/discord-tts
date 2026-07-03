@@ -88,7 +88,11 @@ class TTSCog(commands.Cog):
             text,
             voice,
         )
-        await interaction.response.send_message("Talking...", ephemeral=True)
+        await interaction.response.send_message(
+            "Talking...",
+            ephemeral=True,
+            delete_after=5,
+        )
 
     # TODO: This might not work if bulk messages are sent, as every message in the
     # bundle will have the same priority
