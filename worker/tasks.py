@@ -44,7 +44,7 @@ def get_cached_voice_state(voice_pk):
     return model.get_state_for_audio_prompt(target_path)
 
 
-@shared_task
+@shared_task(ignore_result=True)
 def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
     """
     Generates audio, saves to shared volume, and signals the bot.
@@ -72,5 +72,3 @@ def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
         logger.exception("Failed to publish Redis signal", extra={"error": e})
         output_path.unlink(missing_ok=True)
         raise
-
-    return str(output_path)

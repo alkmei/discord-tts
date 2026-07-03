@@ -33,6 +33,7 @@ class TTSBot(commands.Bot):
             "bot.cogs.voice",
             "bot.cogs.tts",
             "bot.cogs.preferences",
+            "bot.cogs.speaker",
         ]
         intents = discord.Intents.default()
         self.bound_channels: dict[int, int] = {}  # guild_id: text_channel
