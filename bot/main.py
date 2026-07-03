@@ -31,6 +31,7 @@ class TTSBot(commands.Bot):
             "bot.cogs.settings",
         ]
         intents = discord.Intents.default()
+        self.bound_channels: dict[int, int] = {}  # guild_id: text_channel
         super().__init__(command_prefix="!", intents=intents)
 
     async def setup_hook(self) -> None:
