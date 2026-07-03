@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import json
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypedDict
@@ -19,7 +20,7 @@ if TYPE_CHECKING:
 
 logger = setup_logging()
 
-QUEUE_RECONNECT_TIMEOUT = 300  # 5 minutes
+QUEUE_RECONNECT_TIMEOUT = 30
 
 
 class RedisMessage(TypedDict):
@@ -81,8 +82,6 @@ class SpeakerCog(commands.Cog):
 
     async def play_loop(self, guild_id: int) -> None:
         """Continuously plays audio from the queue until it's empty."""
-        # TODO: The bot needs to have fair scheduling across multiple queues.
-        # Consider implementing a round-robin or weighted fair queue scheduler.
         queue = self.queues[guild_id]
 
         while not queue.empty():
@@ -109,7 +108,7 @@ class SpeakerCog(commands.Cog):
             if channel is None:
                 return
 
-            # Pause the queue for 5 minutes to allow bot reconnection
+            # Pause the queue for specified time to allow bot reconnection
             paused_event = asyncio.Event()
             reconnect_task = self.bot.loop.create_task(
                 self._wait_reconnect(guild, paused_event),
@@ -141,6 +140,16 @@ class SpeakerCog(commands.Cog):
             def after_playing(error: Exception | None) -> None:
                 if error:
                     logger.error("Player error", extra={"error": error})
+                try:
+                    fp = Path(file_path)
+                    if fp.exists():
+                        fp.unlink()
+                except Exception as e:
+                    logger.exception(
+                        "Failed to delete %s",
+                        file_path,
+                        extra={"error": e},
+                    )
                 self.bot.loop.call_soon_threadsafe(done.set)
 
             vc.play(discord.FFmpegPCMAudio(file_path), after=after_playing)
