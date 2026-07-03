@@ -3,7 +3,8 @@ from django.db import models
 
 
 class UserPreferences(models.Model):
-    discord_id = models.BigAutoField(primary_key=True)
+    discord_id = models.BigIntegerField(primary_key=True)
+    guild_id = models.BigIntegerField()
     user = models.OneToOneField(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
