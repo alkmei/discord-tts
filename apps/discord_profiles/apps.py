@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class DiscordProfilesConfig(AppConfig):
-    name = 'discord_profiles'
+    name = "apps.discord_profiles"
