@@ -5,7 +5,7 @@ from celery.signals import setup_logging
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
 
-app = Celery("komishan")
+app = Celery("discord-tts")
 
 # Using a string here means the worker doesn't have to serialize
 # the configuration object to child processes.
