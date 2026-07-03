@@ -20,3 +20,5 @@ db
 *.log
 
 *.sqlite3
+
+media/

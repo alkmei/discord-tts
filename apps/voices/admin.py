@@ -29,6 +29,7 @@ class VoiceAdmin(admin.ModelAdmin):
     )
     list_filter = ("guild_id",)
     search_fields = ("name",)
+    actions = ["regenerate_safetensors"]
 
     def audio_source_link(self, voice: Voice) -> str:
         if voice.audio_source:
@@ -39,3 +40,8 @@ class VoiceAdmin(admin.ModelAdmin):
         return "—"
 
     audio_source_link.short_description = "audio_source"
+
+    @admin.action(description="Regenerate safetensor for selected voice(s)")
+    def regenerate_safetensors(self, request, queryset):
+        for voice in queryset:
+            voice.regenerate_safetensors()
