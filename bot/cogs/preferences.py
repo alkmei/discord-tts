@@ -5,25 +5,8 @@ from discord.ext import commands
 
 from apps.discord_profiles.interface import UserPreferenceUpdateData
 from apps.discord_profiles.interface import update_user_preferences
-from apps.voices.interface import get_available_voices
 from apps.voices.interface import get_voice
-
-
-async def voice_autocomplete(
-    interaction: discord.Interaction,
-    current: str,
-) -> list[app_commands.Choice[str]]:
-    if not interaction.guild_id:
-        e = "guild_id should not be None"
-        raise ValueError(e)
-    voices = await sync_to_async(get_available_voices)(interaction.guild_id)
-    return [
-        app_commands.Choice(
-            name=f"{v.name} (System)" if v.guild_id == 0 else v.name,
-            value=v.pk,
-        )
-        for v in voices
-    ]
+from bot.util import voice_autocomplete
 
 
 async def update_preferences(
