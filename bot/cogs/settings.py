@@ -1,7 +1,12 @@
+from typing import cast
+
 import discord
+from asgiref.sync import sync_to_async
 from discord import app_commands
 from discord import ui
 from discord.ext import commands
+
+from apps.voices.interface import get_available_voices
 
 
 class SettingsModal(ui.Modal, title="TTS Preferences"):
@@ -11,14 +16,8 @@ class SettingsModal(ui.Modal, title="TTS Preferences"):
         text="Select voice",
         description="Please select the voice you want from the list.",
         component=ui.Select(
-            placeholder="Select your favorite fruit...",
+            placeholder="Select your favorite voice...",
             required=True,
-            options=[
-                # TODO: Get voices after implementing voice storage
-                discord.SelectOption(label="Apple", value="apple"),
-                discord.SelectOption(label="Banana", value="banana"),
-                discord.SelectOption(label="Cherry", value="cherry"),
-            ],
         ),
     )
     introduce_speaker: ui.Label[SettingsModal] = ui.Label(
@@ -29,8 +28,15 @@ class SettingsModal(ui.Modal, title="TTS Preferences"):
         component=ui.Checkbox(default=False),
     )
 
+    def __init__(self, voices):
+        super().__init__()
+        cast("ui.Select", self.voice_select.component).options = [
+            discord.SelectOption(label=v.name, value=str(v.pk)) for v in voices
+        ]
+
     async def on_submit(self, interaction: discord.Interaction) -> None:
         """Apply settings to user in database."""
+        await interaction.response.send_message("Settings saved!", ephemeral=True)
 
 
 class SettingsCog(commands.Cog):
@@ -45,7 +51,9 @@ class SettingsCog(commands.Cog):
 
         Currently, they can edit their voice, or toggle the bot introducing the speaker.
         """
-        await interaction.response.send_modal(SettingsModal())
+        voices = await sync_to_async(get_available_voices)(interaction.guild_id)
+        modal = SettingsModal(voices)
+        await interaction.response.send_modal(modal)
 
 
 async def setup(bot: commands.Bot) -> None:

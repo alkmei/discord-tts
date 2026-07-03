@@ -1,10 +1,14 @@
 import os
 
 import discord
+import django
 import dotenv
 from discord.ext import commands
 
 from .logging import setup_logging
+
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+django.setup()
 
 dotenv.load_dotenv()
 

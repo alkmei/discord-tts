@@ -88,3 +88,7 @@ class VoiceCog(commands.Cog):
         await guild.voice_client.disconnect(force=False)
         self.bot.bound_channels.pop(guild.id, None)
         await interaction.response.send_message("Left the voice channel.")
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(VoiceCog(bot))

@@ -72,3 +72,7 @@ class TTSCog(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Detect messages from muted people in the bound channels."""
+
+
+async def setup(bot: commands.Bot):
+    await bot.add_cog(TTSCog(bot))
