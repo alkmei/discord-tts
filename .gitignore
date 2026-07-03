@@ -9,8 +9,6 @@ wheels/
 # Virtual environments
 .venv
 .env
-user_voices.json
-voices
 .mypy_cache/
 
 script.txt
@@ -20,3 +18,5 @@ temp_processing
 db
 
 *.log
+
+*.sqlite3

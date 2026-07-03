@@ -1,12 +1,15 @@
 import os
+from functools import lru_cache
+
 import scipy.io.wavfile
 from celery import Celery
-from functools import lru_cache
 from pocket_tts import TTSModel
 
 # Initialize Celery
 app = Celery(
-    "tts_worker", broker=os.getenv("REDIS_URL"), backend=os.getenv("REDIS_URL")
+    "tts_worker",
+    broker=os.getenv("REDIS_URL"),
+    backend=os.getenv("REDIS_URL"),
 )
 
 # Global model variable (loaded once when worker starts)
@@ -25,8 +28,8 @@ def get_model():
 
 @lru_cache(maxsize=4)
 def get_cached_voice_state(voice_name):
-    """
-    Loads voice state from disk.
+    """Loads voice state from disk.
+
     Keeps only the last 4 used voices in memory.
     """
     model = get_model()
