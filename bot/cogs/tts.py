@@ -152,23 +152,41 @@ class TTSCog(commands.Cog):
         if bound_channel_id is None:
             return
 
+        if not self._bot_in_voice_channel(message.guild):
+            return
+
+        member = message.author
+
+        if not isinstance(member, discord.Member):
+            return
+
+        if not member.voice or not member.voice.self_mute:
+            return
+
         # Check if message is from the bound text channel
         is_bound_text = message.channel.id == bound_channel_id
 
         # Check if message is from voice channel (VC chat)
-        is_vc_message = False
-        if self._bot_in_voice_channel(message.guild):
-            vc = message.guild.voice_client
-            if vc and vc.channel:
-                is_vc_message = message.channel == vc.channel
+        vc = message.guild.voice_client
+        is_vc_message = vc and vc.channel and message.channel == vc.channel
 
         if not is_bound_text and not is_vc_message:
             return
 
         resolved = resolve_mentions(message.content, message.guild)
+
+        effective_voice = None
+        if message.author.id:
+            prefs = await sync_to_async(get_user_preferences)(
+                message.author.id,
+                message.guild.id,
+            )
+            if prefs.voice:
+                effective_voice = prefs.voice.id
+
         start_tts_task(
             resolved,
-            None,
+            effective_voice,
             message.guild.id,
             message.channel.id,
         )
