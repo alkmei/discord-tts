@@ -67,3 +67,18 @@ def update_user_preferences(
 
     except Exception as e:
         return False, str(e)
+
+
+def get_user_preferences(
+    discord_id: int,
+    guild_id: int,
+) -> UserPreferences:
+    """
+    Returns the user preferences, creating if not exists.
+    """
+    with transaction.atomic():
+        prefs, _ = UserPreferences.objects.get_or_create(
+            discord_id=discord_id,
+            defaults={"guild_id": guild_id},
+        )
+        return prefs

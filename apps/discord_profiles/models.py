@@ -3,9 +3,10 @@ from django.db import models
 
 
 class UserPreferences(models.Model):
-    discord_id = models.BigIntegerField(primary_key=True)
+    # Each preference is tracked per guild
+    discord_id = models.BigIntegerField()
     guild_id = models.BigIntegerField()
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         null=True,
