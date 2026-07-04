@@ -62,4 +62,6 @@ class TTSBot(commands.Bot):
 
 
 bot = TTSBot()
-bot.run(TOKEN)
+
+if __name__ == "__main__":
+    bot.run(TOKEN)
