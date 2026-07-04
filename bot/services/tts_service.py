@@ -66,8 +66,12 @@ def start_tts_task(
     else:
         sequence_number = redis_client.incr(seq_key)
 
-    print(
-        f"[DISPATCHER] Guild {guild_id} | Task Count: {current_count} | SYN: {is_syn} | SEQ: {sequence_number}",
+    logger.debug(
+        "[DISPATCHER] Guild %s | Task Count: %s | SYN: %s | SEQ: %s",
+        guild_id,
+        current_count,
+        is_syn,
+        sequence_number,
     )
 
     priority = get_priority(current_count)
