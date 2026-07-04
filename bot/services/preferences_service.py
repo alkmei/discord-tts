@@ -5,11 +5,10 @@ from asgiref.sync import sync_to_async
 from apps.discord_profiles.interface import UserPreferenceUpdateData
 from apps.discord_profiles.interface import update_user_preferences
 from apps.discord_profiles.interface import update_user_voice as sync_update_user_voice
+from apps.discord_profiles.models import UserPreferences
 
 if TYPE_CHECKING:
     import discord
-
-    from apps.discord_profiles.models import UserPreferences
 
 
 async def update_preferences(
