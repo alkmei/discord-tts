@@ -14,6 +14,10 @@ class TTSCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
+    def _bot_in_voice_channel(self, guild: discord.Guild) -> bool:
+        vc = guild.voice_client
+        return vc is not None and vc.channel is not None
+
     @app_commands.command(name="say", description="Talk")
     @app_commands.describe(voice="The voice to use", text="The text to say")
     @app_commands.autocomplete(voice=voice_autocomplete)
@@ -34,6 +38,13 @@ class TTSCog(commands.Cog):
         if not interaction.channel_id:
             await interaction.response.send_message(
                 "This command needs to be used in a text channel",
+                ephemeral=True,
+            )
+            return
+
+        if not self._bot_in_voice_channel(interaction.guild):
+            await interaction.response.send_message(
+                "The bot is not in a voice channel.",
                 ephemeral=True,
             )
             return
@@ -64,6 +75,13 @@ class TTSCog(commands.Cog):
         if not interaction.channel_id:
             await interaction.response.send_message(
                 "This command needs to be used in a text channel",
+                ephemeral=True,
+            )
+            return
+
+        if not self._bot_in_voice_channel(interaction.guild):
+            await interaction.response.send_message(
+                "The bot is not in a voice channel.",
                 ephemeral=True,
             )
             return
