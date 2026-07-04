@@ -24,3 +24,16 @@ def get_voice(guild_id: int, voice_pk: int):
         models.Q(guild_id=guild_id) | models.Q(guild_id=0),
         pk=voice_pk,
     ).first()
+
+
+def get_voices_by_name(guild_id: int, voice_names: list[str]):
+    """Get voices by their names.
+
+    Only include available voices to the user.
+    """
+    return list(
+        Voice.objects.filter(
+            models.Q(guild_id=guild_id) | models.Q(guild_id=0),
+            name__in=voice_names,
+        ),
+    )

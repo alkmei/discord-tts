@@ -5,7 +5,9 @@ import typing
 
 import emoji
 import redis
+from asgiref.sync import sync_to_async
 
+from apps.voices.interface import get_voices_by_name
 from worker.tasks import generate_tts_task
 
 if typing.TYPE_CHECKING:
@@ -97,3 +99,40 @@ def clean_tts_text(text: str) -> str:
     # Pocket-TTS use to have this bug that cut the first part of a message off.
     # Adding a period was a failsafe, but not sure if that's still needed.
     return "." + content
+
+
+async def process_multiline_input(text: str, guild_id: int) -> list[tuple[int, str]]:
+    """Process the input from the multiline modal
+
+    Input is in format "<voice_name>: <text>" seperated by newline.
+    Returns a list of the tuple (voice_id, processed_text)
+    """
+    lines = [line.strip() for line in text.strip().split("\n") if line.strip()]
+
+    voice_names = []
+    for line in lines:
+        if ":" in line:
+            name_part = line.split(":", 1)[0].strip()
+            voice_names.append(name_part)
+
+    voices = await sync_to_async(get_voices_by_name)(
+        guild_id=guild_id,
+        voice_names=voice_names,
+    )
+
+    voice_map = {voice.name.lower(): (voice.pk, voice.name) for voice in voices}
+    results: list[tuple[int, str]] = []
+
+    for line in lines:
+        if ":" not in line:
+            continue
+
+        name_part, text_part = line.split(":", 1)
+        voice_name = name_part.strip()
+
+        if voice_name.lower() in voice_map:
+            voice_pk, _ = voice_map[voice_name.lower()]
+            cleaned = clean_tts_text(text_part.strip())
+            results.append((voice_pk, cleaned))
+
+    return results

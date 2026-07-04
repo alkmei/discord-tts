@@ -5,6 +5,7 @@ from discord.ext import commands
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
 from bot.services.voice_service import voice_autocomplete
+from bot.ui.multiline_modal import MultilineTTSInputModal
 
 
 class TTSCog(commands.Cog):
@@ -53,6 +54,21 @@ class TTSCog(commands.Cog):
     @app_commands.command(name="multi", description="Play multiple voicelines")
     async def multi(self, interaction: discord.Interaction):
         """Plays multiple lines with multiple voices"""
+        if not interaction.guild_id or not interaction.guild:
+            await interaction.response.send_message(
+                "This command can only be used in servers.",
+                ephemeral=True,
+            )
+            return
+
+        if not interaction.channel_id:
+            await interaction.response.send_message(
+                "This command needs to be used in a text channel",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_modal(MultilineTTSInputModal())
 
     @app_commands.command(name="stop", description="Stop playback")
     async def stop(self, interaction: discord.Interaction) -> None:
