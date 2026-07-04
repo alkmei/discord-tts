@@ -7,7 +7,6 @@ from discord import app_commands
 from discord.ext import commands
 
 from apps.discord_profiles.interface import get_user_preferences
-from bot.services.tts_service import redis_client
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
 from bot.services.voice_service import voice_autocomplete
@@ -109,36 +108,23 @@ class TTSCog(commands.Cog):
 
         await interaction.response.send_modal(MultilineTTSInputModal())
 
-    @app_commands.command(name="stop", description="Stop playback")
+    @app_commands.command(name="stop", description="Stop playback and clear queue")
     async def stop(self, interaction: discord.Interaction) -> None:
         """Stop current message and clear queue for channel."""
-        if not interaction.guild_id:
-            return
-        self._abort_queue(interaction.guild_id)
         await interaction.response.send_message(
-            "Stopped.",
+            "WIP.",
             ephemeral=True,
             delete_after=5,
         )
 
     @app_commands.command(name="skip", description="Skip current voice line")
     async def skip(self, interaction: discord.Interaction) -> None:
-        """Skip the current or next message queued to play for channel."""
-        if not interaction.guild_id:
-            return
-        self._abort_queue(interaction.guild_id)
+        """Skip only the current message."""
         await interaction.response.send_message(
-            "Skipped.",
+            "WIP.",
             ephemeral=True,
             delete_after=5,
         )
-
-    def _abort_queue(self, guild_id: int) -> None:
-        """Signal workers to skip remaining tasks for a guild and reset the counter."""
-        counter_key = f"guild_line_task_count:{guild_id}"
-        abort_key = f"tts_abort:{guild_id}"
-        redis_client.set(abort_key, "1", ex=2)
-        redis_client.delete(counter_key)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
