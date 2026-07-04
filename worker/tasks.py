@@ -50,8 +50,13 @@ def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
     Generates audio, saves to shared volume, and signals the bot.
     """
     counter_key = f"guild_line_task_count:{guild_id}"
+    abort_key = f"tts_abort:{guild_id}"
 
     try:
+        if redis_client.get(abort_key):
+            logger.info("TTS task aborted for guild %i.", guild_id)
+            return
+
         model = get_model()
         voice_state = get_cached_voice_state(voice_pk)
 
