@@ -19,5 +19,5 @@ It uses Celery for workers, which is configured in Django.
 - [ ] Testing
 - [ ] Make it so some voices can be limited to certain users
 - [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
-- [ ] lines do NOT play in order!
-- [ ] stop and skip do the same thing (also don't work)
+- [x] lines do NOT play in order!
+- [x] stop and skip do the same thing (also don't work)
