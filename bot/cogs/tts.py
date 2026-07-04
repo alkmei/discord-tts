@@ -2,9 +2,11 @@ from typing import TYPE_CHECKING
 from typing import cast
 
 import discord
+from asgiref.sync import sync_to_async
 from discord import app_commands
 from discord.ext import commands
 
+from apps.discord_profiles.interface import get_user_preferences
 from bot.services.tts_service import redis_client
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
@@ -57,9 +59,19 @@ class TTSCog(commands.Cog):
             return
 
         resolved = resolve_mentions(text, interaction.guild)
+
+        effective_voice = voice
+        if effective_voice is None and interaction.user.id:
+            prefs = await sync_to_async(get_user_preferences)(
+                interaction.user.id,
+                interaction.guild_id,
+            )
+            if prefs.voice:
+                effective_voice = prefs.voice.id
+
         start_tts_task(
             resolved,
-            voice,
+            effective_voice,
             interaction.guild_id,
             interaction.channel_id,
         )

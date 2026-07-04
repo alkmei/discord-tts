@@ -77,7 +77,7 @@ def get_user_preferences(
     Returns the user preferences, creating if not exists.
     """
     with transaction.atomic():
-        prefs, _ = UserPreferences.objects.get_or_create(
+        prefs, _ = UserPreferences.objects.select_related("voice").get_or_create(
             discord_id=discord_id,
             defaults={"guild_id": guild_id},
         )
