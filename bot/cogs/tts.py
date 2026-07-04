@@ -5,7 +5,6 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
-from bot.main import TTSBot
 from bot.services.tts_service import redis_client
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
@@ -64,10 +63,11 @@ class TTSCog(commands.Cog):
             interaction.guild_id,
             interaction.channel_id,
         )
+
+        username = interaction.user.display_name
+
         await interaction.response.send_message(
-            "Talking...",
-            ephemeral=True,
-            delete_after=5,
+            f"{username}: {text}",
         )
 
     @app_commands.command(name="multi", description="Play multiple voicelines")
