@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypedDict
+from typing import cast
 
 import discord
 import redis.asyncio as aioredis
@@ -220,6 +221,53 @@ class SpeakerCog(commands.Cog):
                 event.set()
                 return
             await asyncio.sleep(10)
+
+    async def skip_audio(self, guild_id: int) -> bool:
+        """Skips the currently playing audio."""
+        guild = self.bot.get_guild(guild_id)
+        if (
+            guild
+            and guild.voice_client
+            and cast("VoiceClient", guild.voice_client).is_playing()
+        ):
+            # Calling stop() triggers the 'after' callback in execute_play,
+            # which sets the 'done' event and allows the loop to continue.
+            cast("VoiceClient", guild.voice_client).stop()
+            return True
+        return False
+
+    async def stop_audio(self, guild_id: int) -> None:
+        """Stops current audio and clears all pending queues/buffers."""
+        # Clear the playback queue
+        if guild_id in self.queues:
+            queue = self.queues[guild_id]
+            while not queue.empty():
+                try:
+                    data = queue.get_nowait()
+                    # Clean up the files that were never played
+                    fp = Path(data["file_path"])
+                    if fp.exists():
+                        fp.unlink()
+                except asyncio.QueueEmpty:
+                    break
+
+        # Clear the re-ordering buffer
+        if guild_id in self.buffers:
+            for data in self.buffers[guild_id].values():
+                fp = Path(data["file_path"])
+                if fp.exists():
+                    fp.unlink()
+            self.buffers[guild_id].clear()
+
+        # Reset sequencing logic
+        self.expected_seq[guild_id] = 0
+        self.waiting_for_syn[guild_id] = True
+
+        # Stop the current hardware playback
+        guild = self.bot.get_guild(guild_id)
+        if guild and guild.voice_client:
+            if cast("VoiceClient", guild.voice_client).is_playing():
+                cast("VoiceClient", guild.voice_client).stop()
 
 
 async def setup(bot: commands.Bot):

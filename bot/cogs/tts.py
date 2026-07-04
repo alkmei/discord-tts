@@ -7,6 +7,7 @@ from discord import app_commands
 from discord.ext import commands
 
 from apps.discord_profiles.interface import get_user_preferences
+from bot.cogs.speaker import SpeakerCog
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
 from bot.services.voice_service import voice_autocomplete
@@ -111,20 +112,43 @@ class TTSCog(commands.Cog):
     @app_commands.command(name="stop", description="Stop playback and clear queue")
     async def stop(self, interaction: discord.Interaction) -> None:
         """Stop current message and clear queue for channel."""
-        await interaction.response.send_message(
-            "WIP.",
-            ephemeral=True,
-            delete_after=5,
-        )
+        if not interaction.guild_id:
+            return
+
+        speaker_cog = cast("SpeakerCog", self.bot.get_cog("SpeakerCog"))
+        if not speaker_cog:
+            await interaction.response.send_message(
+                "Speaker service not found.",
+                ephemeral=True,
+            )
+            return
+
+        await speaker_cog.stop_audio(interaction.guild_id)
+        await interaction.response.send_message("Stopped and cleared the queue.")
 
     @app_commands.command(name="skip", description="Skip current voice line")
     async def skip(self, interaction: discord.Interaction) -> None:
         """Skip only the current message."""
-        await interaction.response.send_message(
-            "WIP.",
-            ephemeral=True,
-            delete_after=5,
-        )
+        if not interaction.guild_id:
+            return
+
+        speaker_cog = cast("SpeakerCog", self.bot.get_cog("SpeakerCog"))
+
+        if not speaker_cog:
+            await interaction.response.send_message(
+                "Speaker service not found.",
+                ephemeral=True,
+            )
+            return
+
+        success = await speaker_cog.skip_audio(interaction.guild_id)
+        if success:
+            await interaction.response.send_message("⏭️ Skipped.")
+        else:
+            await interaction.response.send_message(
+                "Nothing is playing right now.",
+                ephemeral=True,
+            )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
