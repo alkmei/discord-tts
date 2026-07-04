@@ -60,6 +60,7 @@ class TTSCog(commands.Cog):
 
         resolved = resolve_mentions(text, interaction.guild)
 
+        # TODO: Seperate this part out, also in on_message.
         effective_voice = voice
         if effective_voice is None and interaction.user.id:
             prefs = await sync_to_async(get_user_preferences)(
@@ -141,11 +142,12 @@ class TTSCog(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
-        """Detect messages from muted people in the bound channels."""
-        if message.author.bot:
-            return
+        """Detect messages from muted people in the bound channels.
 
-        if not message.guild:
+        That means people who are self muted, not deafened, and the bound channels are
+        the channel the bot was called in with /join and the VC channel.
+        """
+        if message.author.bot or not message.guild:
             return
 
         bound_channel_id = self.bot.bound_channels.get(message.guild.id)
@@ -157,10 +159,11 @@ class TTSCog(commands.Cog):
 
         member = message.author
 
-        if not isinstance(member, discord.Member):
-            return
-
-        if not member.voice or not member.voice.self_mute:
+        if (
+            not isinstance(member, discord.Member)
+            or not member.voice
+            or not member.voice.self_mute
+        ):
             return
 
         # Check if message is from the bound text channel
