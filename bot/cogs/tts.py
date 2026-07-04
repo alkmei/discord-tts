@@ -1,7 +1,10 @@
+from typing import cast
+
 import discord
 from discord import app_commands
 from discord.ext import commands
 
+from bot.main import TTSBot
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
 from bot.services.voice_service import voice_autocomplete
@@ -12,7 +15,7 @@ class TTSCog(commands.Cog):
     """Interface with the TTS."""
 
     def __init__(self, bot: commands.Bot) -> None:
-        self.bot = bot
+        self.bot = cast("TTSBot", bot)
 
     def _bot_in_voice_channel(self, guild: discord.Guild) -> bool:
         vc = guild.voice_client
@@ -99,6 +102,36 @@ class TTSCog(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         """Detect messages from muted people in the bound channels."""
+        if message.author.bot:
+            return
+
+        if not message.guild:
+            return
+
+        bound_channel_id = self.bot.bound_channels.get(message.guild.id)
+        if bound_channel_id is None:
+            return
+
+        # Check if message is from the bound text channel
+        is_bound_text = message.channel.id == bound_channel_id
+
+        # Check if message is from voice channel (VC chat)
+        is_vc_message = False
+        if self._bot_in_voice_channel(message.guild):
+            vc = message.guild.voice_client
+            if vc and vc.channel:
+                is_vc_message = message.channel == vc.channel
+
+        if not is_bound_text and not is_vc_message:
+            return
+
+        resolved = resolve_mentions(message.content, message.guild)
+        start_tts_task(
+            resolved,
+            None,
+            message.guild.id,
+            message.channel.id,
+        )
 
 
 async def setup(bot: commands.Bot):
