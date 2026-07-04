@@ -6,7 +6,10 @@
         "editor.codeActionsOnSave": {
             "source.fixAll": "explicit",
             "source.organizeImports": "explicit"
-        },
+        }
     },
-    "python.terminal.activateEnvironment": false
+    "python.terminal.activateEnvironment": false,
+    "emmet.includeLanguages": {
+        "django-html": "html"
+    }
 }

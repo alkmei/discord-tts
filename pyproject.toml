@@ -20,11 +20,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = [
-    "flower>=2.0.1",
-    "mypy>=2.1.0",
-    "ruff>=0.15.5",
-]
+dev = ["djlint>=1.40.3", "flower>=2.0.1", "mypy>=2.1.0", "ruff>=0.15.5"]
 
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu" }]
@@ -115,3 +111,18 @@ plugins = ["mypy_django_plugin.main"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
+
+[tool.djlint]
+profile = "jinja"
+include = "H017,H035"
+indent = 2
+max_line_length = 119
+blank_line_after_tag = "load,extends"
+close_void_tags = true
+format_css = true
+format_js = true
+ignore_blocks = "raw"
+# TODO: remove T002 when fixed https://github.com/Riverside-Healthcare/djLint/issues/687
+ignore = "H006,H030,H031,T002,T028"
+css.indent_size = 2
+js.indent_size = 2
