@@ -54,6 +54,7 @@ def start_tts_task(
 
     - Manages the Redis priority queue
     - Dispatches the Celery task
+    - Tracks FIFO order via a per-guild sequence number
     """
     cleaned = clean_tts_text(text)
 
@@ -70,9 +71,13 @@ def start_tts_task(
     )
     redis_client.incr(counter_key)
 
+    # Track FIFO order with a per-guild sequence counter
+    seq_key = f"tts_sequence:{guild_id}"
+    sequence = redis_client.incr(seq_key)
+
     voice_pk = voice or 1
     return generate_tts_task.apply_async(
-        args=(cleaned, voice_pk, guild_id, channel_id),
+        args=(cleaned, voice_pk, guild_id, channel_id, sequence),
         priority=priority,
     )
 

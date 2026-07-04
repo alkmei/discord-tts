@@ -81,15 +81,25 @@ class SpeakerCog(commands.Cog):
             )
 
     async def play_loop(self, guild_id: int) -> None:
-        """Continuously plays audio from the queue until it's empty."""
+        """Continuously plays audio from the queue in FIFO order by sequence number."""
         queue = self.queues[guild_id]
 
-        while not queue.empty():
-            data = await queue.get()
-            channel_id = int(data["channel_id"])
-            file_path = data["file_path"]
+        while True:
+            # Drain the queue, sort by sequence, play in order
+            items: list[dict[str, Any]] = []
+            while not queue.empty():
+                items.append(await queue.get())
 
-            await self.execute_play(guild_id, channel_id, file_path)
+            if not items:
+                break
+
+            # Sort by sequence number for FIFO order (default to 0 for old items)
+            items.sort(key=lambda x: x.get("sequence", 0))
+
+            for data in items:
+                channel_id = int(data["channel_id"])
+                file_path = data["file_path"]
+                await self.execute_play(guild_id, channel_id, file_path)
 
     async def execute_play(
         self,
