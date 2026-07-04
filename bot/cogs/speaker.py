@@ -82,8 +82,10 @@ class SpeakerCog(commands.Cog):
 
         # If we receive a SYN, we reset our sequence tracking
         if syn:
-            print(
-                f"[SPEAKER] SYN received. Starting/Resetting Guild {guild_id} to SEQ {seq}",
+            logger.info(
+                "SYN received. Starting/Resetting Guild %s to SEQ %s",
+                guild_id,
+                seq,
             )
             self.expected_seq[guild_id] = seq
             self.waiting_for_syn[guild_id] = False
@@ -94,8 +96,9 @@ class SpeakerCog(commands.Cog):
         # If we are still waiting for a SYN but this packet wasn't it,
         # stop here. Do NOT drain the buffer yet.
         if self.waiting_for_syn.get(guild_id, True):
-            print(
-                f"[SPEAKER] Holding SEQ {seq} in buffer. Still waiting for SYN (SEQ 0).",
+            logger.info(
+                "Holding SEQ %s in buffer. Still waiting for SYN (SEQ 0).",
+                seq,
             )
             return
 
@@ -108,8 +111,10 @@ class SpeakerCog(commands.Cog):
             count += 1
 
         if count > 0:
-            print(
-                f"[SPEAKER] Drained {count} items. Next expected: {self.expected_seq[guild_id]}",
+            logger.info(
+                "Drained %s items. Next expected: %s",
+                count,
+                self.expected_seq[guild_id],
             )
 
         # Ensure play loop is running
@@ -129,7 +134,10 @@ class SpeakerCog(commands.Cog):
                 # If the queue is empty AND no more items are in the re-order buffer,
                 # we go back into "Waiting for SYN" mode for the next burst.
                 if queue.empty() and not self.buffers.get(guild_id):
-                    print(f"[PLAYER] Guild {guild_id} Idle. Re-arming SYN requirement.")
+                    logger.info(
+                        "Guild %s Idle. Re-arming SYN requirement.",
+                        guild_id,
+                    )
                     self.waiting_for_syn[guild_id] = True
                     break
                 continue
