@@ -39,10 +39,14 @@ class SpeakerCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.redis_url = os.getenv("REDIS_URL") or "redis://localhost"
-        # Stores a queue for every guild: {guild_id: asyncio.Queue}
         self.queues: dict[int, asyncio.Queue[dict[str, Any]]] = {}
-        # Tracks which guilds are currently playing audio
         self.playing_tasks: dict[int, asyncio.Task[None]] = {}
+        self.buffers: dict[
+            int,
+            dict[int, dict[str, Any]],
+        ] = {}  # {guild_id: {seq_num: data}}
+        self.expected_seq: dict[int, int] = {}  # {guild_id: next_expected_seq}
+        self.waiting_for_syn: dict[int, bool] = {}
 
     async def cog_load(self) -> None:
         """Start the Redis listener with the cog."""
@@ -66,29 +70,73 @@ class SpeakerCog(commands.Cog):
                 await self.enqueue_audio(data)
 
     async def enqueue_audio(self, data: dict[str, Any]) -> None:
-        """Adds a new audio file to the guild's specific queue."""
         guild_id = int(data["guild_id"])
+        seq = data.get("seq", 0)
+        syn = data.get("syn", False)
 
         if guild_id not in self.queues:
             self.queues[guild_id] = asyncio.Queue()
+            self.buffers[guild_id] = {}
+            self.expected_seq[guild_id] = 0
+            self.waiting_for_syn[guild_id] = True  # Start by waiting for SYN
 
-        await self.queues[guild_id].put(data)
+        # If we receive a SYN, we reset our sequence tracking
+        if syn:
+            print(
+                f"[SPEAKER] SYN received. Starting/Resetting Guild {guild_id} to SEQ {seq}",
+            )
+            self.expected_seq[guild_id] = seq
+            self.waiting_for_syn[guild_id] = False
 
-        # If there isn't a 'player' loop running for this guild, start one
+        # Add the incoming data to the buffer regardless
+        self.buffers[guild_id][seq] = data
+
+        # If we are still waiting for a SYN but this packet wasn't it,
+        # stop here. Do NOT drain the buffer yet.
+        if self.waiting_for_syn.get(guild_id, True):
+            print(
+                f"[SPEAKER] Holding SEQ {seq} in buffer. Still waiting for SYN (SEQ 0).",
+            )
+            return
+
+        # Drain buffer into playback queue (TCP-style ordering)
+        count = 0
+        while self.expected_seq[guild_id] in self.buffers[guild_id]:
+            next_data = self.buffers[guild_id].pop(self.expected_seq[guild_id])
+            await self.queues[guild_id].put(next_data)
+            self.expected_seq[guild_id] += 1
+            count += 1
+
+        if count > 0:
+            print(
+                f"[SPEAKER] Drained {count} items. Next expected: {self.expected_seq[guild_id]}",
+            )
+
+        # Ensure play loop is running
         if guild_id not in self.playing_tasks or self.playing_tasks[guild_id].done():
             self.playing_tasks[guild_id] = self.bot.loop.create_task(
                 self.play_loop(guild_id),
             )
 
     async def play_loop(self, guild_id: int) -> None:
-        """Continuously plays audio from the queue until it's empty."""
         queue = self.queues[guild_id]
 
-        while not queue.empty():
-            data = await queue.get()
+        while True:
+            # We use a small timeout to see if the queue is truly finished
+            try:
+                data = await asyncio.wait_for(queue.get(), timeout=2.0)
+            except TimeoutError:
+                # If the queue is empty AND no more items are in the re-order buffer,
+                # we go back into "Waiting for SYN" mode for the next burst.
+                if queue.empty() and not self.buffers.get(guild_id):
+                    print(f"[PLAYER] Guild {guild_id} Idle. Re-arming SYN requirement.")
+                    self.waiting_for_syn[guild_id] = True
+                    break
+                continue
+
+            # Play the audio
             channel_id = int(data["channel_id"])
             file_path = data["file_path"]
-
             await self.execute_play(guild_id, channel_id, file_path)
 
     async def execute_play(

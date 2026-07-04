@@ -50,29 +50,33 @@ def start_tts_task(
     guild_id: int,
     channel_id: int,
 ) -> AsyncResult:
-    """Queue a TTS task for generation and playback.
-
-    - Manages the Redis priority queue
-    - Dispatches the Celery task
-    """
     cleaned = clean_tts_text(text)
-
     counter_key = f"guild_line_task_count:{guild_id}"
+    seq_key = f"guild_sequence:{guild_id}"
+
     current_count_raw = redis_client.get(counter_key)
     current_count = int(current_count_raw) if current_count_raw else 0
-    priority = get_priority(current_count)
-    logger.info(
-        "TTS task queued for guild %s, priority %s (queue_depth=%s, voice=%i)",
-        guild_id,
-        priority,
-        current_count,
-        voice or -1,
+
+    # Logic: If no tasks are currently in flight, this is a SYN (Start)
+    is_syn = current_count == 0
+
+    if is_syn:
+        sequence_number = 0
+        redis_client.set(seq_key, 0)
+    else:
+        sequence_number = redis_client.incr(seq_key)
+
+    print(
+        f"[DISPATCHER] Guild {guild_id} | Task Count: {current_count} | SYN: {is_syn} | SEQ: {sequence_number}",
     )
+
+    priority = get_priority(current_count)
     redis_client.incr(counter_key)
 
     voice_pk = voice or 1
     return generate_tts_task.apply_async(
         args=(cleaned, voice_pk, guild_id, channel_id),
+        kwargs={"seq": sequence_number, "syn": is_syn},
         priority=priority,
     )
 

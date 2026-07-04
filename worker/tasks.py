@@ -45,7 +45,14 @@ def get_cached_voice_state(voice_pk):
 
 
 @shared_task(ignore_result=True)
-def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
+def generate_tts_task(
+    text: str,
+    voice_pk: int,
+    guild_id: int,
+    channel_id: int,
+    seq: int = 0,
+    syn: bool = False,
+):
     """
     Generates audio, saves to shared volume, and signals the bot.
     """
@@ -61,13 +68,17 @@ def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
         output_path = Path(settings.TTS_SHARED_DIR) / filename
 
         scipy.io.wavfile.write(
-            output_path, model.sample_rate, audio_tensor.cpu().numpy()
+            output_path,
+            model.sample_rate,
+            audio_tensor.cpu().numpy(),
         )
 
         payload = {
             "guild_id": guild_id,
             "channel_id": channel_id,
             "file_path": str(output_path),
+            "seq": seq,
+            "syn": syn,
         }
 
         try:
