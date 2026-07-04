@@ -1,14 +1,29 @@
+import logging
+import os
 import re
-from typing import cast
 
 import discord
 import emoji
+import redis
 from discord import app_commands
 from discord.ext import commands
 
-from bot.cogs.speaker import SpeakerCog
 from bot.util import voice_autocomplete
 from worker.tasks import generate_tts_task
+
+logger = logging.getLogger(__name__)
+
+redis_client = redis.from_url(os.getenv("REDIS_URL", "redis://localhost:6379/0"))
+
+# Priority brackets: (threshold, priority) sorted by threshold ascending
+_PRIORITY_BRACKETS = [(3, 9), (10, 5)]
+
+
+def _get_priority(count: int) -> int:
+    for threshold, priority in _PRIORITY_BRACKETS:
+        if count < threshold:
+            return priority
+    return 1
 
 
 def clean_tts_text(
@@ -94,8 +109,6 @@ class TTSCog(commands.Cog):
             delete_after=5,
         )
 
-    # TODO: This might not work if bulk messages are sent, as every message in the
-    # bundle will have the same priority
     async def start_tts_task(
         self,
         guild_id: int,
@@ -105,13 +118,17 @@ class TTSCog(commands.Cog):
     ) -> None:
         cleaned = clean_tts_text(text, self.bot.get_guild(guild_id))
 
-        speaker_cog = cast("SpeakerCog", self.bot.get_cog("SpeakerCog"))
-        guild_in_progress = (
-            speaker_cog
-            and guild_id in speaker_cog.playing_tasks
-            and not speaker_cog.playing_tasks[guild_id].done()
+        counter_key = f"guild_line_task_count:{guild_id}"
+        current_count_raw = redis_client.get(counter_key)
+        current_count = int(current_count_raw) if current_count_raw else 0
+        priority = _get_priority(current_count)
+        logger.info(
+            "TTS task queued for guild %s, priority %s (queue_depth=%s)",
+            guild_id,
+            priority,
+            current_count,
         )
-        priority = 1 if guild_in_progress else 9
+        redis_client.incr(counter_key)
 
         voice_pk = voice or 1
         generate_tts_task.apply_async(

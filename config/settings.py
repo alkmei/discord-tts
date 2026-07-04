@@ -142,6 +142,12 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 CELERY_TIMEZONE = TIME_ZONE
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "priority_steps": list(range(10)),
+    "sep": ":",
+    "queue_order_strategy": "priority",
+}
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # Logging configuration
 LOGGING = {

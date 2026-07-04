@@ -49,26 +49,31 @@ def generate_tts_task(text: str, voice_pk: int, guild_id: int, channel_id: int):
     """
     Generates audio, saves to shared volume, and signals the bot.
     """
-    model = get_model()
-    voice_state = get_cached_voice_state(voice_pk)
-
-    audio_tensor = model.generate_audio(voice_state, text)
-
-    filename = f"{guild_id}_{channel_id}_{uuid.uuid4().hex[:8]}.wav"
-    output_path = Path(settings.TTS_SHARED_DIR) / filename
-
-    scipy.io.wavfile.write(output_path, model.sample_rate, audio_tensor.cpu().numpy())
-
-    payload = {
-        "guild_id": guild_id,
-        "channel_id": channel_id,
-        "file_path": str(output_path),
-    }
+    counter_key = f"guild_line_task_count:{guild_id}"
 
     try:
-        redis_client.publish("tts_play_queue", json.dumps(payload))
-        logger.info("Published TTS signal for guild %i to Redis.", guild_id)
-    except Exception as e:
-        logger.exception("Failed to publish Redis signal", extra={"error": e})
-        output_path.unlink(missing_ok=True)
-        raise
+        model = get_model()
+        voice_state = get_cached_voice_state(voice_pk)
+
+        audio_tensor = model.generate_audio(voice_state, text)
+
+        filename = f"{guild_id}_{channel_id}_{uuid.uuid4().hex[:8]}.wav"
+        output_path = Path(settings.TTS_SHARED_DIR) / filename
+
+        scipy.io.wavfile.write(output_path, model.sample_rate, audio_tensor.cpu().numpy())
+
+        payload = {
+            "guild_id": guild_id,
+            "channel_id": channel_id,
+            "file_path": str(output_path),
+        }
+
+        try:
+            redis_client.publish("tts_play_queue", json.dumps(payload))
+            logger.info("Published TTS signal for guild %i to Redis.", guild_id)
+        except Exception as e:
+            logger.exception("Failed to publish Redis signal", extra={"error": e})
+            output_path.unlink(missing_ok=True)
+            raise
+    finally:
+        redis_client.decr(counter_key)
