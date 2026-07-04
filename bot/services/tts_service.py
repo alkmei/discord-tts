@@ -62,10 +62,11 @@ def start_tts_task(
     current_count = int(current_count_raw) if current_count_raw else 0
     priority = get_priority(current_count)
     logger.info(
-        "TTS task queued for guild %s, priority %s (queue_depth=%s)",
+        "TTS task queued for guild %s, priority %s (queue_depth=%s, voice=%i)",
         guild_id,
         priority,
         current_count,
+        voice or -1,
     )
     redis_client.incr(counter_key)
 
