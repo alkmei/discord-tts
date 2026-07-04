@@ -12,61 +12,55 @@ class UserPreferenceUpdateData(TypedDict, total=False):
     Represents the valid fields that can be updated for a user.
     """
 
-    voice_id: int
     introduce_speaker: bool
+    speak_while_muted: bool
+    echo_say_command: bool
 
 
 def update_user_preferences(
     discord_id: int,
     guild_id: int,
     data: UserPreferenceUpdateData,
-) -> tuple[bool, str]:
+) -> tuple[bool, UserPreferences]:
     """
-    Updates user preferences.
+    Updates non-voice user preferences.
     """
-    try:
-        with transaction.atomic():
-            prefs, _ = UserPreferences.objects.get_or_create(
-                discord_id=discord_id,
-                defaults={"guild_id": guild_id},
-            )
+    with transaction.atomic():
+        defaults = {k: v for k, v in data.items() if k != "voice_id"}
 
-            voice_id = data.get("voice_id")
-            if voice_id is not None:
-                voice = get_voice(guild_id, voice_id)
+        if not defaults:
+            return True, UserPreferences()
 
-                if not voice:
-                    return False, f"Voice {voice_id} is not available in this server."
-                prefs.voice = voice
+        prefs, _ = UserPreferences.objects.select_related("voice").update_or_create(
+            discord_id=discord_id,
+            guild_id=guild_id,
+            defaults={"guild_id": guild_id, **defaults},
+        )
 
-            intro = data.get("introduce_speaker")
-            if intro is not None:
-                prefs.introduce_speaker = intro
+        return True, prefs
 
-            prefs.save()
 
-            voice_part = (
-                f"Updated voice to `{prefs.voice.name}`"
-                if prefs.voice and voice_id is not None
-                else None
-            )
-            intro_part = (
-                "Will now introduce you"
-                if intro
-                else "Will no longer introduce you"
-                if intro is not None
-                else None
-            )
-            if voice_part is None and intro_part is None:
-                return True, "No changes made."
-            if intro_part and voice_part:
-                return True, f"{voice_part} and {intro_part.lower()}."
-            if voice_part:
-                return True, f"{voice_part}."
-            return True, f"{intro_part}."
+def update_user_voice(
+    discord_id: int,
+    guild_id: int,
+    voice_id: int,
+) -> str | None:
+    """
+    Updates the user's voice selection.
+    Returns the voice name on success, None on failure.
+    """
+    with transaction.atomic():
+        voice = get_voice(guild_id, voice_id)
+        if not voice:
+            return None
 
-    except Exception as e:
-        return False, str(e)
+        UserPreferences.objects.update_or_create(
+            discord_id=discord_id,
+            guild_id=guild_id,
+            defaults={"guild_id": guild_id, "voice": voice},
+        )
+
+        return voice.name
 
 
 def get_user_preferences(

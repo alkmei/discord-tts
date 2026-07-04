@@ -20,6 +20,8 @@ class UserPreferences(models.Model):
         blank=True,
     )
     introduce_speaker = models.BooleanField(default=False)
+    speak_while_muted = models.BooleanField(default=True)
+    echo_say_command = models.BooleanField(default=True)
 
     def __str__(self) -> str:
         return f"{self.user.username if self.user else 'No user'} - {self.discord_id}"
