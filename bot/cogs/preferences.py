@@ -12,10 +12,30 @@ class SettingsCog(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
 
-    @app_commands.command(name="settings", description="Adjust preferences")
+    @app_commands.command(name="voice", description="Change the TTS voice")
     @app_commands.autocomplete(voice=voice_autocomplete)
     @app_commands.describe(
         voice="The voice you want to use",
+    )
+    async def voice(
+        self,
+        interaction: discord.Interaction,
+        voice: int,
+    ) -> None:
+        """Change the TTS voice."""
+        success, message = await update_preferences(
+            interaction,
+            voice,
+            None,
+        )
+        status = "" if success else "Failed: "
+        await interaction.response.send_message(
+            f"{status}{message}",
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="settings", description="Adjust preferences")
+    @app_commands.describe(
         introduce_speaker="Whether the bot should introduce you",
     )
     @app_commands.choices(
@@ -27,11 +47,10 @@ class SettingsCog(commands.Cog):
     async def settings(
         self,
         interaction: discord.Interaction,
-        voice: int | None = None,
         introduce_speaker: int | None = None,
     ) -> None:
         """Adjust TTS preferences."""
-        if not voice and not introduce_speaker:
+        if not introduce_speaker:
             await interaction.response.send_message(
                 "You didn't change anything...",
                 ephemeral=True,
@@ -40,7 +59,7 @@ class SettingsCog(commands.Cog):
 
         success, message = await update_preferences(
             interaction,
-            voice,
+            None,
             introduce_speaker,
         )
         status = "" if success else "Failed: "
