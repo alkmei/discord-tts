@@ -14,7 +14,7 @@ from bot.services.tts_service import start_tts_task
 
 class MultilineTTSInputModal(Modal):
     text_input: Label[MultilineTTSInputModal] = Label(
-        text="Enter your TTS messages",
+        text="Enter your script",
         component=TextInput(
             placeholder="<voice>: <text>\n\n"
             "Example:\nalba: Hello world\nanna: This is a test",
