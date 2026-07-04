@@ -1,16 +1,15 @@
-from asgiref.sync import sync_to_async
-
 import discord
+from asgiref.sync import sync_to_async
 from discord import app_commands
 from discord.ext import commands
 
 from apps.discord_profiles.interface import get_user_preferences
 from bot.services.preferences_service import update_user_voice
-from bot.ui.preferences_modal import PreferenceModal
 from bot.services.voice_service import voice_autocomplete
+from bot.ui.preferences_modal import PreferenceModal
 
 
-class SettingsCog(commands.Cog):
+class PreferencesCog(commands.Cog):
     """Manage user settings."""
 
     def __init__(self, bot: commands.Bot) -> None:
@@ -66,4 +65,4 @@ class SettingsCog(commands.Cog):
 
 
 async def setup(bot: commands.Bot) -> None:
-    await bot.add_cog(SettingsCog(bot))
+    await bot.add_cog(PreferencesCog(bot))
