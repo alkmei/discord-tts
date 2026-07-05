@@ -9,8 +9,8 @@ migrate:  # Apply migrations
 clearmigrations:  # Delete all migration files
 	find apps -path '*/migrations/*.py' ! -name '__init__.py' -delete
 
-dev:  # Start overmind with Procfile
-	overmind start Procfile
+dev:  # Start honcho with Procfile
+	uv run honcho start
 
 help:  # Show this help message
 	@grep -E '^[a-zA-Z_-]+:.*?# .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?# "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'

@@ -63,7 +63,6 @@ DJANGO_APPS = [
 THIRD_PARTY_APPS = [
     "compressor",
     "crispy_forms",
-    "crispy_bootstrap5",
     "allauth",
     "allauth.account",
     "allauth.mfa",
@@ -122,7 +121,7 @@ MIDDLEWARE = [
 # ------------------------------------------------------------------------------
 STATIC_ROOT = str(BASE_DIR / "staticfiles")
 STATIC_URL = "/static/"
-STATICFILES_DIRS = [str(APPS_DIR / "static")]
+STATICFILES_DIRS = [str(BASE_DIR / "static")]
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
@@ -154,8 +153,6 @@ TEMPLATES = [
     },
 ]
 
-CRISPY_TEMPLATE_PACK = "bootstrap5"
-CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 
 # EMAIL
 # ------------------------------------------------------------------------------

@@ -569,6 +569,7 @@ dependencies = [
 dev = [
     { name = "djlint" },
     { name = "flower" },
+    { name = "honcho" },
     { name = "mypy" },
     { name = "ruff" },
 ]
@@ -601,6 +602,7 @@ requires-dist = [
 dev = [
     { name = "djlint", specifier = ">=1.40.3" },
     { name = "flower", specifier = ">=2.0.1" },
+    { name = "honcho", specifier = ">=2.0.0" },
     { name = "mypy", specifier = ">=2.1.0" },
     { name = "ruff", specifier = ">=0.15.5" },
 ]
@@ -931,6 +933,18 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/0b/dd/7ac658d54b9fb7999a0ccb07ad863b413cbaf5cf172f48ebcd9497ec7263/hf_xet-1.2.0-cp37-abi3-musllinux_1_2_aarch64.whl", hash = "sha256:4c1428c9ae73ec0939410ec73023c4f842927f39db09b063b9482dac5a3bb737", size = 3413812, upload-time = "2025-10-24T19:04:24.585Z" },
     { url = "https://files.pythonhosted.org/packages/92/68/89ac4e5b12a9ff6286a12174c8538a5930e2ed662091dd2572bbe0a18c8a/hf_xet-1.2.0-cp37-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:a55558084c16b09b5ed32ab9ed38421e2d87cf3f1f89815764d1177081b99865", size = 3508920, upload-time = "2025-10-24T19:04:26.927Z" },
     { url = "https://files.pythonhosted.org/packages/cb/44/870d44b30e1dcfb6a65932e3e1506c103a8a5aea9103c337e7a53180322c/hf_xet-1.2.0-cp37-abi3-win_amd64.whl", hash = "sha256:e6584a52253f72c9f52f9e549d5895ca7a471608495c4ecaa6cc73dba2b24d69", size = 2905735, upload-time = "2025-10-24T19:04:35.928Z" },
+]
+
+[[package]]
+name = "honcho"
+version = "2.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/65/c8/d860888358bf5c8a6e7d78d1b508b59b0e255afd5655f243b8f65166dafd/honcho-2.0.0.tar.gz", hash = "sha256:af3815c03c634bf67d50f114253ea9fef72ecff26e4fd06b29234789ac5b8b2e", size = 45618, upload-time = "2024-10-06T14:26:53.871Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/48/1c/25631fc359955569e63f5446dbb7022c320edf9846cbe892ee5113433a7e/honcho-2.0.0-py3-none-any.whl", hash = "sha256:56dcd04fc72d362a4befb9303b1a1a812cba5da283526fbc6509be122918ddf3", size = 22093, upload-time = "2024-10-06T14:26:52.181Z" },
 ]
 
 [[package]]
