@@ -1,4 +1,5 @@
 import os
+import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -71,3 +72,5 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 STATIC_URL = "static/"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+TTS_SHARED_DIR = os.getenv("TTS_SHARED_DIR", tempfile.gettempdir())
