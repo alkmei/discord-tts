@@ -12,13 +12,3 @@
 
 The bot interfaces with Django by setting it up with `django.setup()` in `main.py`.
 It uses Celery for workers, which is configured in Django.
-
-## TODO
-
-- [ ] Admins should be able to configure the behavior they want the users to be able to control
-- [ ] Testing
-- [ ] Make it so some voices can be limited to certain users
-- [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
-- [x] lines do NOT play in order!
-- [x] stop and skip do the same thing (also don't work)
-- [ ] Make simplified way to run the bot without django
