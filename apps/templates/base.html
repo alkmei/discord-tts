@@ -15,71 +15,46 @@
         {% block css %}
             {% vite_asset 'assets/main.css' %}
         {% endblock css %}
-        <!-- Le javascript
-    ================================================== -->
-        {# Placed at the top of the document so pages load faster with defer #}
         {% block javascript %}
             {% vite_asset 'assets/main.ts' %}
         {% endblock javascript %}
     </head>
-    <body class="{% block bodyclass %}{% endblock bodyclass %}">
+    <body class="bg-gray-50 text-gray-900 {% block bodyclass %}{% endblock bodyclass %}">
         {% block body %}
-            <div class="mb-1">
-                <nav class="navbar navbar-expand-md navbar-light bg-light">
-                    <div class="container-fluid">
-                        <button class="navbar-toggler navbar-toggler-right"
-                                type="button"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#navbarSupportedContent"
-                                aria-controls="navbarSupportedContent"
-                                aria-expanded="false"
-                                aria-label="Toggle navigation">
-                            <span class="navbar-toggler-icon"></span>
-                        </button>
-                        <a class="navbar-brand" href="{% url 'home' %}">Discord TTS</a>
-                        <div class="collapse navbar-collapse" id="navbarSupportedContent">
-                            <ul class="navbar-nav mr-auto">
-                                <li class="nav-item active">
-                                    <a class="nav-link" href="{% url 'home' %}">Home <span class="visually-hidden">(current)</span></a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link" href="{% url 'about' %}">About</a>
-                                </li>
-                                {% if request.user.is_authenticated %}
-                                    <li class="nav-item">
-                                        <a class="nav-link" href="{% url 'users:detail' request.user %}">{% translate "My Profile" %}</a>
-                                    </li>
-                                    <li class="nav-item">
-                                        {# URL provided by django-allauth/account/urls.py #}
-                                        <a class="nav-link" href="{% url 'account_logout' %}">{% translate "Sign Out" %}</a>
-                                    </li>
-                                {% else %}
-                                    {% if ACCOUNT_ALLOW_REGISTRATION %}
-                                        <li class="nav-item">
-                                            {# URL provided by django-allauth/account/urls.py #}
-                                            <a id="sign-up-link" class="nav-link" href="{% url 'account_signup' %}">{% translate "Sign Up" %}</a>
-                                        </li>
-                                    {% endif %}
-                                    <li class="nav-item">
-                                        {# URL provided by django-allauth/account/urls.py #}
-                                        <a id="log-in-link" class="nav-link" href="{% url 'account_login' %}">{% translate "Sign In" %}</a>
-                                    </li>
+            <nav class="bg-white border-b border-gray-200">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <div class="flex justify-between h-16">
+                        <div class="flex items-center">
+                            <a href="{% url 'home' %}" class="text-xl font-bold text-indigo-600">Discord TTS</a>
+                        </div>
+                        <!-- Desktop Menu -->
+                        <div class="hidden md:flex items-center space-x-4">
+                            <a href="{% url 'home' %}"
+                               class="text-gray-600 hover:text-gray-900 px-3 py-2">Home</a>
+                            <a href="{% url 'about' %}"
+                               class="text-gray-600 hover:text-gray-900 px-3 py-2">About</a>
+                            {% if request.user.is_authenticated %}
+                                <a href="{% url 'users:detail' request.user %}"
+                                   class="text-gray-600 hover:text-gray-900 px-3 py-2">{% translate "My Profile" %}</a>
+                                <a href="{% url 'account_logout' %}"
+                                   class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">{% translate "Sign Out" %}</a>
+                            {% else %}
+                                {% if ACCOUNT_ALLOW_REGISTRATION %}
+                                    <a href="{% url 'account_signup' %}"
+                                       class="text-gray-600 hover:text-gray-900 px-3 py-2">{% translate "Sign Up" %}</a>
                                 {% endif %}
-                            </ul>
+                                <a href="{% url 'account_login' %}"
+                                   class="bg-indigo-600 text-white px-4 py-2 rounded-md text-sm font-medium hover:bg-indigo-700">{% translate "Sign In" %}</a>
+                            {% endif %}
                         </div>
                     </div>
-                </nav>
-            </div>
-            <div class="container">
+                </div>
+            </nav>
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
                 {% if messages %}
                     {% for message in messages %}
-                        <div class="alert alert-dismissible {% if message.tags %}alert-{{ message.tags }}{% endif %}">
-                            {{ message }}
-                            <button type="button"
-                                    class="btn-close"
-                                    data-bs-dismiss="alert"
-                                    aria-label="Close"></button>
-                        </div>
+                        <div class="mb-4 p-4 rounded-md {% if message.tags == 'error' %}bg-red-100 text-red-700{% else %}bg-green-100 text-green-700{% endif %}"
+                             role="alert">{{ message }}</div>
                     {% endfor %}
                 {% endif %}
                 {% block main %}
@@ -89,19 +64,9 @@
                 {% endblock main %}
             </div>
         {% endblock body %}
-        <!-- /container -->
         {% block modal %}
         {% endblock modal %}
         {% block inline_javascript %}
-            {% comment %}
-      Script tags with only code, no src (defer by default). To run
-      with a "defer" so that you run inline code:
-      <script>
-        window.addEventListener('DOMContentLoaded', () => {
-          /* Run whatever you want */
-        });
-      </script>
-            {% endcomment %}
         {% endblock inline_javascript %}
     </body>
 </html>

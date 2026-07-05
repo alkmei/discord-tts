@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "useDefineForClassFields": true,
+    "module": "ESNext",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "skipLibCheck": true,
+
+    /* Bundler mode */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "isolatedModules": true,
+    "moduleDetection": "force",
+    "noEmit": true,
+
+    /* Linting */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+
+    /* Paths (Optional: Helps with imports) */
+    "paths": {
+      "@/*": ["./assets/*"]
+    },
+
+    /* Ensure Vite's client types are included */
+    "types": ["vite/client"]
+  },
+  "include": ["assets/**/*", "vite.config.ts"],
+  "exclude": ["node_modules", "staticfiles", "static/dist"]
+}
