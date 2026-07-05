@@ -1,15 +1,15 @@
 {
-    "python.analysis.typeCheckingMode": "basic",
-    "[python]": {
-        "editor.formatOnSave": true,
-        "editor.defaultFormatter": "charliermarsh.ruff",
-        "editor.codeActionsOnSave": {
-            "source.fixAll": "explicit",
-            "source.organizeImports": "explicit"
-        }
-    },
-    "python.terminal.activateEnvironment": false,
-    "emmet.includeLanguages": {
-        "django-html": "html"
+  "python.analysis.typeCheckingMode": "basic",
+  "[python]": {
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll": "explicit",
+      "source.organizeImports": "explicit"
     }
+  },
+  "python.terminal.activateEnvironment": false,
+  "emmet.includeLanguages": {
+    "django-html": "html"
+  }
 }
