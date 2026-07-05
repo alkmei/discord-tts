@@ -191,12 +191,11 @@ ACCOUNT_ALLOW_REGISTRATION = (
     os.getenv("DJANGO_ACCOUNT_ALLOW_REGISTRATION", "True") == "True"
 )
 ACCOUNT_LOGIN_METHODS = {"email"}
-ACCOUNT_EMAIL_REQUIRED = True
-ACCOUNT_USERNAME_REQUIRED = False
-ACCOUNT_SIGNUP_PASSWORD_ENTER_TWICE = True
+ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
+DJANGO_ADMIN_FORCE_ALLAUTH = True
 
 # LOGGING
 # ------------------------------------------------------------------------------
