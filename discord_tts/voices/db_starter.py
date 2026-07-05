@@ -1,5 +1,5 @@
 def add_default_voices(apps, schema_editor):
-    Voice = discord_tts.get_model("voices", "Voice")
+    Voice = apps.get_model("voices", "Voice")
     english_voices = [
         "alba",
         "anna",
