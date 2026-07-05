@@ -65,9 +65,12 @@
                                 <li class="nav-item active">
                                     <a class="nav-link" href="{% url 'home' %}">Home <span class="visually-hidden">(current)</span></a>
                                 </li>
-                                {% comment %} {% if request.user.is_authenticated %}
+                                <li class="nav-item">
+                                    <a class="nav-link" href="{% url 'about' %}">About</a>
+                                </li>
+                                {% if request.user.is_authenticated %}
                                     <li class="nav-item">
-                                        <a class="nav-link" href="{% url 'users:detail' request.user.username %}">{% translate "My Profile" %}</a>
+                                        <a class="nav-link" href="{% url 'users:detail' request.user %}">{% translate "My Profile" %}</a>
                                     </li>
                                     <li class="nav-item">
                                         {# URL provided by django-allauth/account/urls.py #}
@@ -84,7 +87,7 @@
                                         {# URL provided by django-allauth/account/urls.py #}
                                         <a id="log-in-link" class="nav-link" href="{% url 'account_login' %}">{% translate "Sign In" %}</a>
                                     </li>
-                                {% endif %} {% endcomment %}
+                                {% endif %}
                             </ul>
                         </div>
                     </div>

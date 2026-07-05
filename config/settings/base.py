@@ -12,10 +12,9 @@ load_dotenv()
 # PATHS
 # ------------------------------------------------------------------------------
 # BASE_DIR is the root of the project (where manage.py is)
-BASE_DIR = Path(__file__).resolve().parent.parent
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 # APPS_DIR is where your local apps reside
 APPS_DIR = BASE_DIR / "apps"
-
 # GENERAL
 # ------------------------------------------------------------------------------
 # https://docs.djangoproject.com/en/dev/ref/settings/#debug
@@ -192,6 +191,7 @@ ACCOUNT_ALLOW_REGISTRATION = (
 )
 ACCOUNT_LOGIN_METHODS = {"email"}
 ACCOUNT_SIGNUP_FIELDS = ["email*", "password1*", "password2*"]
+ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_SESSION_REMEMBER = True
 ACCOUNT_UNIQUE_EMAIL = True
 ACCOUNT_EMAIL_VERIFICATION = "mandatory"
