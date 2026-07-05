@@ -25,4 +25,3 @@ def config_loggers(*args, **kwargs):
 
 # Load task modules from all registered Django app configs.
 app.autodiscover_tasks()
-app.autodiscover_tasks(["worker"])

@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "discord_tts.preferences",
     "discord_tts.voices",
+    "discord_tts.speech",
 ]
 
 MIDDLEWARE = [
