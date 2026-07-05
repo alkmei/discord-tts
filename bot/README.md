@@ -21,3 +21,4 @@ It uses Celery for workers, which is configured in Django.
 - [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
 - [x] lines do NOT play in order!
 - [x] stop and skip do the same thing (also don't work)
+- [ ] Make simplified way to run the bot without django
