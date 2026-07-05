@@ -2,7 +2,7 @@ import discord
 from asgiref.sync import sync_to_async
 from discord import app_commands
 
-from apps.voices.interface import get_available_voices
+from discord_tts.voices.interface import get_available_voices
 
 
 async def voice_autocomplete(

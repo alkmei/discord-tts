@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
-from apps.voices.forms import VoiceForm
+from discord_tts.voices.forms import VoiceForm
 
 from .models import Voice
 

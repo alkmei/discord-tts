@@ -2,7 +2,7 @@ from django.db import transaction
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from apps.voices.tasks import generate_safetensors
+from discord_tts.voices.tasks import generate_safetensors
 
 from .models import Voice
 

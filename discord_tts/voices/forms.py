@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.voices.models import Voice
+from discord_tts.voices.models import Voice
 
 
 class VoiceForm(forms.ModelForm):

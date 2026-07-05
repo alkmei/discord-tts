@@ -2,7 +2,7 @@ from typing import TypedDict
 
 from django.db import transaction
 
-from apps.voices.interface import get_voice
+from discord_tts.voices.interface import get_voice
 
 from .models import UserPreferences
 

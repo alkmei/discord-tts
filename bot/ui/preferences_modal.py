@@ -9,7 +9,7 @@ from discord.ui import Modal
 from bot.services.preferences_service import update_preferences
 
 if TYPE_CHECKING:
-    from apps.discord_profiles.models import UserPreferences
+    from discord_tts.discord_profiles.models import UserPreferences
 
 
 class PreferenceModal(Modal):

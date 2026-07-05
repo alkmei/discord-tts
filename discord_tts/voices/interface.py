@@ -1,6 +1,6 @@
 from django.db import models
 
-from apps.voices.models import Voice
+from discord_tts.voices.models import Voice
 
 
 def get_available_voices(guild_id: int):

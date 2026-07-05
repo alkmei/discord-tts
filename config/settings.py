@@ -14,8 +14,8 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "apps.discord_profiles",
-    "apps.voices",
+    "discord_tts.discord_profiles",
+    "discord_tts.voices",
 ]
 
 MIDDLEWARE = [

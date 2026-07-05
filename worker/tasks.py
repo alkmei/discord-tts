@@ -9,7 +9,7 @@ import scipy.io.wavfile
 from celery import shared_task
 from django.conf import settings
 
-from apps.voices.models import Voice
+from discord_tts.voices.models import Voice
 
 from .tts_model import get_model
 

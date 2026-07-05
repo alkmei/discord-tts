@@ -2,10 +2,12 @@ from typing import TYPE_CHECKING
 
 from asgiref.sync import sync_to_async
 
-from apps.discord_profiles.interface import UserPreferenceUpdateData
-from apps.discord_profiles.interface import update_user_preferences
-from apps.discord_profiles.interface import update_user_voice as sync_update_user_voice
-from apps.discord_profiles.models import UserPreferences
+from discord_tts.discord_profiles.interface import UserPreferenceUpdateData
+from discord_tts.discord_profiles.interface import update_user_preferences
+from discord_tts.discord_profiles.interface import (
+    update_user_voice as sync_update_user_voice,
+)
+from discord_tts.discord_profiles.models import UserPreferences
 
 if TYPE_CHECKING:
     import discord

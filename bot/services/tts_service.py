@@ -7,7 +7,7 @@ import emoji
 import redis
 from asgiref.sync import sync_to_async
 
-from apps.voices.interface import get_voices_by_name
+from discord_tts.voices.interface import get_voices_by_name
 from worker.tasks import generate_tts_task
 
 if typing.TYPE_CHECKING:
