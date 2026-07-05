@@ -1,9 +1,9 @@
 from django.contrib import admin
 
-from .models import UserPreferences
+from .models import UserGuildPreferences
 
 
-@admin.register(UserPreferences)
-class UserPreferencesAdmin(admin.ModelAdmin):
+@admin.register(UserGuildPreferences)
+class UserGuildPreferencesAdmin(admin.ModelAdmin):
     list_display = ("discord_id", "user", "voice", "introduce_speaker")
     search_fields = ("discord_id", "user__username")

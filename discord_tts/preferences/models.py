@@ -2,7 +2,7 @@ from django.conf import settings
 from django.db import models
 
 
-class UserPreferences(models.Model):
+class UserGuildPreferences(models.Model):
     # Each preference is tracked per guild
     discord_id = models.BigIntegerField()
     guild_id = models.BigIntegerField()
@@ -23,7 +23,7 @@ class UserPreferences(models.Model):
     speak_while_muted = models.BooleanField(default=True)
     echo_say_command = models.BooleanField(default=True)
 
-    objects: models.Manager[UserPreferences] = models.Manager()
+    objects: models.Manager[UserGuildPreferences] = models.Manager()
 
     def __str__(self) -> str:
         return f"{self.user.username if self.user else 'No user'} - {self.discord_id}"

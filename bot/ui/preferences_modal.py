@@ -9,7 +9,7 @@ from discord.ui import Modal
 from bot.services.preferences_service import update_preferences
 
 if TYPE_CHECKING:
-    from discord_tts.preferences.models import UserPreferences
+    from discord_tts.preferences.models import UserGuildPreferences
 
 
 class PreferenceModal(Modal):
@@ -30,11 +30,11 @@ class PreferenceModal(Modal):
         component=Checkbox(),
     )
 
-    def __init__(self, prefs: UserPreferences):
+    def __init__(self, prefs: UserGuildPreferences):
         self._set_defaults(prefs)
         super().__init__(title="Preferences")
 
-    def _set_defaults(self, prefs: UserPreferences) -> None:
+    def _set_defaults(self, prefs: UserGuildPreferences) -> None:
         cast(
             "Checkbox",
             self.introduce_speaker.component,

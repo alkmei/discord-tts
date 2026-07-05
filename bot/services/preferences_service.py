@@ -7,7 +7,7 @@ from discord_tts.preferences.interface import update_user_preferences
 from discord_tts.preferences.interface import (
     update_user_voice as sync_update_user_voice,
 )
-from discord_tts.preferences.models import UserPreferences
+from discord_tts.preferences.models import UserGuildPreferences
 
 if TYPE_CHECKING:
     import discord
@@ -18,7 +18,7 @@ async def update_preferences(
     introduce_speaker: int | None = None,
     speak_while_muted: int | None = None,
     echo_say_command: int | None = None,
-) -> tuple[bool, UserPreferences]:
+) -> tuple[bool, UserGuildPreferences]:
     if not interaction.user.id or not interaction.guild_id:
         e = "user.id and guild_id should not be None"
         raise ValueError(e)
@@ -36,7 +36,7 @@ async def update_preferences(
         data["echo_say_command"] = bool(echo_say_command)
 
     if not data:
-        return True, UserPreferences()
+        return True, UserGuildPreferences()
 
     success, prefs = await sync_to_async(update_user_preferences)(
         discord_id,

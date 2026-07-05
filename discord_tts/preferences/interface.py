@@ -4,7 +4,7 @@ from django.db import transaction
 
 from discord_tts.voices.interface import get_voice
 
-from .models import UserPreferences
+from .models import UserGuildPreferences
 
 
 class UserPreferenceUpdateData(TypedDict, total=False):
@@ -21,7 +21,7 @@ def update_user_preferences(
     discord_id: int,
     guild_id: int,
     data: UserPreferenceUpdateData,
-) -> tuple[bool, UserPreferences]:
+) -> tuple[bool, UserGuildPreferences]:
     """
     Updates non-voice user preferences.
     """
@@ -29,9 +29,11 @@ def update_user_preferences(
         defaults = {k: v for k, v in data.items() if k != "voice_id"}
 
         if not defaults:
-            return True, UserPreferences()
+            return True, UserGuildPreferences()
 
-        prefs, _ = UserPreferences.objects.select_related("voice").update_or_create(
+        prefs, _ = UserGuildPreferences.objects.select_related(
+            "voice"
+        ).update_or_create(
             discord_id=discord_id,
             guild_id=guild_id,
             defaults={"guild_id": guild_id, **defaults},
@@ -54,7 +56,7 @@ def update_user_voice(
         if not voice:
             return None
 
-        UserPreferences.objects.update_or_create(
+        UserGuildPreferences.objects.update_or_create(
             discord_id=discord_id,
             guild_id=guild_id,
             defaults={"guild_id": guild_id, "voice": voice},
@@ -66,12 +68,12 @@ def update_user_voice(
 def get_user_preferences(
     discord_id: int,
     guild_id: int,
-) -> UserPreferences:
+) -> UserGuildPreferences:
     """
     Returns the user preferences, creating if not exists.
     """
     with transaction.atomic():
-        prefs, _ = UserPreferences.objects.select_related("voice").get_or_create(
+        prefs, _ = UserGuildPreferences.objects.select_related("voice").get_or_create(
             discord_id=discord_id,
             defaults={"guild_id": guild_id},
         )
