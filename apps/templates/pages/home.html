@@ -1,1 +1,18 @@
 {% extends "base.html" %}
+
+{% block content %}
+    <section class="hero min-h-125 h-[60vh] bg-base-100"
+             aria-labelledby="hero-title">
+        <div class="hero-content flex-col lg:flex-row-reverse gap-12 max-w-6xl">
+            <img src="https://img.daisyui.com/images/stock/photo-1635805737707-575885ab0820.webp"
+                 alt="Description of the visual content for screen readers"
+                 class="max-w-sm rounded-box shadow-xl object-cover" />
+            <div class="max-w-xl">
+                <h1 id="hero-title"
+                    class="text-5xl font-extrabold tracking-tight leading-tight">A Cloning TTS</h1>
+                <p class="py-6 text-lg opacity-90">Capture your voices and make them say anything to your friends!</p>
+                <button class="btn btn-primary btn-lg shadow-lg">Get Started</button>
+            </div>
+        </div>
+    </section>
+{% endblock content %}

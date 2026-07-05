@@ -1,1 +1,76 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:ital,wght@0,100..900;1,100..900&family=Geist+Pixel&family=Geist:ital,wght@0,100..900;1,100..900&display=swap');
 @import "tailwindcss";
+@plugin "daisyui";
+@plugin "daisyui/theme" {
+  name: "discord-dark";
+  default: true;
+  prefersdark: true;
+  color-scheme: "dark";
+  
+  --color-base-100: oklch(15% 0.04 260); /* Canvas (#0a0d3a) */
+  --color-base-200: oklch(20% 0.05 260); /* Surface-Indigo (#1e2353) */
+  --color-base-300: oklch(25% 0.06 260); /* Surface-Onyx (#23272a) */
+  --color-base-content: oklch(98% 0.01 260); /* Ink (#ffffff) */
+  
+  --color-primary: oklch(55% 0.20 270); /* Blurple (#5865f2) */
+  --color-primary-content: oklch(98% 0.01 260);
+  
+  --color-secondary: oklch(65% 0.22 340); /* Magenta (#ec48bd) */
+  --color-secondary-content: oklch(98% 0.01 260);
+  
+  --color-accent: oklch(75% 0.18 160); /* Green (#35ed7e) */
+  --color-accent-content: oklch(10% 0.02 260);
+  
+  --color-neutral: oklch(25% 0.05 260);
+  --color-neutral-content: oklch(98% 0.01 260);
+  
+  --color-info: oklch(65% 0.15 250); /* Link (#00b0f4) */
+  --color-info-content: oklch(98% 0.01 260);
+  
+  --color-success: oklch(75% 0.18 160);
+  --color-error: oklch(60% 0.20 30);
+  
+  --radius-selector: 0.75rem; /* ~12px */
+  --radius-field: 0.375rem;   /* ~6px */
+  --radius-box: 1rem;         /* ~16px */
+}
+
+@plugin "daisyui/theme" {
+  name: "discord-light";
+  default: false;
+  prefersdark: false;
+  color-scheme: "light";
+  
+  --color-base-100: oklch(98% 0.01 260); /* Paper White */
+  --color-base-200: oklch(92% 0.02 260); /* Muted Surface */
+  --color-base-300: oklch(85% 0.03 260); /* Hairline/Border */
+  --color-base-content: oklch(10% 0.02 260); /* Ink Dark (#000000) */
+  
+  --color-primary: oklch(55% 0.20 270); /* Blurple remains the hero */
+  --color-primary-content: oklch(98% 0.01 260);
+  
+  --color-secondary: oklch(65% 0.22 340);
+  --color-secondary-content: oklch(98% 0.01 260);
+  
+  --color-accent: oklch(75% 0.18 160);
+  --color-accent-content: oklch(10% 0.02 260);
+  
+  --color-neutral: oklch(80% 0.04 260);
+  --color-neutral-content: oklch(10% 0.02 260);
+  
+  --color-info: oklch(60% 0.18 250);
+  --color-info-content: oklch(98% 0.01 260);
+  
+  --color-success: oklch(70% 0.15 160);
+  --color-error: oklch(60% 0.20 30);
+  
+  --radius-selector: 0.75rem;
+  --radius-field: 0.375rem;
+  --radius-box: 1rem;
+}
+
+@theme {
+    --font-sans: "Geist", sans-serif;
+    --font-mono: "Geist Mono", monospace;
+    --font-pixel: "Geist Pixel", sans-serif;
+}
