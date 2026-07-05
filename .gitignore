@@ -22,4 +22,5 @@ db
 *.sqlite3
 
 media/
-.overmind.sock
+staticfiles/
+node_modules/

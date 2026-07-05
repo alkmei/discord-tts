@@ -70,10 +70,12 @@ INSTALLED_APPS += ["django_extensions"]
 # CELERY_TASK_ALWAYS_EAGER = True
 # CELERY_TASK_EAGER_PROPAGATES = True
 
-# django-compressor
-# ------------------------------------------------------------------------------
-# https://django-compressor.readthedocs.io/en/latest/settings/#django.conf.settings.COMPRESS_ENABLED
-COMPRESS_ENABLED = os.getenv("COMPRESS_ENABLED", default=False)
-
+DJANGO_VITE = {
+    "default": {
+        "dev_mode": DEBUG,
+        "static_url_prefix": "",
+        "manifest_path": "static/manifest.json",
+    },
+}
 # Your stuff...
 # ------------------------------------------------------------------------------

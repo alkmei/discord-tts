@@ -3,3 +3,4 @@ celery: uv run celery -A config worker --loglevel=info
 flower: uv run celery -A config flower --port=5555
 bot: uv run python -m bot.main
 infra: docker compose up
+vite: pnpm dev

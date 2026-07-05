@@ -61,7 +61,7 @@ DJANGO_APPS = [
 ]
 
 THIRD_PARTY_APPS = [
-    "compressor",
+    "django_vite",
     "crispy_forms",
     "allauth",
     "allauth.account",
@@ -125,11 +125,11 @@ STATICFILES_DIRS = [str(BASE_DIR / "static")]
 STATICFILES_FINDERS = [
     "django.contrib.staticfiles.finders.FileSystemFinder",
     "django.contrib.staticfiles.finders.AppDirectoriesFinder",
-    "compressor.finders.CompressorFinder",
 ]
 
 MEDIA_ROOT = str(BASE_DIR / "media")
 MEDIA_URL = "/media/"
+
 
 # TEMPLATES
 # ------------------------------------------------------------------------------
