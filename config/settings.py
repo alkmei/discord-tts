@@ -19,7 +19,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "discord_tts.discord_profiles",
+    "discord_tts.preferences",
     "discord_tts.voices",
 ]
 

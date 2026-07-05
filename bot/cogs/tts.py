@@ -11,7 +11,7 @@ from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
 from bot.services.voice_service import voice_autocomplete
 from bot.ui.multiline_modal import MultilineTTSInputModal
-from discord_tts.discord_profiles.interface import get_user_preferences
+from discord_tts.preferences.interface import get_user_preferences
 
 if TYPE_CHECKING:
     from bot.main import TTSBot

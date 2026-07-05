@@ -6,7 +6,7 @@ from discord.ext import commands
 from bot.services.preferences_service import update_user_voice
 from bot.services.voice_service import voice_autocomplete
 from bot.ui.preferences_modal import PreferenceModal
-from discord_tts.discord_profiles.interface import get_user_preferences
+from discord_tts.preferences.interface import get_user_preferences
 
 
 class PreferencesCog(commands.Cog):
