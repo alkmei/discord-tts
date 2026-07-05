@@ -3,6 +3,8 @@ import typing
 
 from django.db import models
 
+from .validators import audio_extension_validator
+
 logger = logging.getLogger(__name__)
 
 if typing.TYPE_CHECKING:
@@ -12,7 +14,13 @@ if typing.TYPE_CHECKING:
 class Voice(models.Model):
     name = models.CharField(max_length=32)
     guild_id = models.PositiveBigIntegerField()
-    audio_source = models.FileField(upload_to="raw-voices/", null=True)
+    audio_source = models.FileField(
+        upload_to="raw-voices/",
+        null=True,
+        validators=[
+            audio_extension_validator,
+        ],
+    )
     processed_safetensor = models.FileField(upload_to="voices/", null=True, blank=True)
 
     objects: Manager[Voice] = models.Manager()
