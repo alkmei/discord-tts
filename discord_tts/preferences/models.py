@@ -1,17 +1,13 @@
-from django.conf import settings
 from django.db import models
 
 
 class UserGuildPreferences(models.Model):
     # Each preference is tracked per guild
-    discord_id = models.BigIntegerField()
-    guild_id = models.BigIntegerField()
-    user = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    account = models.ForeignKey(
+        "common.DiscordAccount",
         on_delete=models.CASCADE,
-        null=True,
-        blank=True,
     )
+    guild_id = models.BigIntegerField()
 
     voice = models.ForeignKey(
         "voices.Voice",
@@ -28,10 +24,10 @@ class UserGuildPreferences(models.Model):
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["discord_id", "guild_id"],
+                fields=["account_id", "guild_id"],
                 name="unique_user_per_guild",
             ),
         ]
 
     def __str__(self) -> str:
-        return f"{self.user.username if self.user else 'No user'} - {self.discord_id}"
+        return f"{self.account.discord_id} preferences"

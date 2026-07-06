@@ -5,5 +5,9 @@ from .models import UserGuildPreferences
 
 @admin.register(UserGuildPreferences)
 class UserGuildPreferencesAdmin(admin.ModelAdmin):
-    list_display = ("discord_id", "user", "voice", "introduce_speaker")
-    search_fields = ("discord_id", "user__username")
+    list_display = (
+        "account__discord_id",
+        "account__name",
+        "voice",
+    )
+    search_fields = ("account__discord_id", "account__name")

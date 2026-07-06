@@ -8,6 +8,9 @@ class DiscordAccount(models.Model):
     """
 
     discord_id = models.PositiveBigIntegerField(unique=True, db_index=True)
+    name = models.CharField()
+
+    objects: models.Manager[DiscordAccount] = models.Manager()
 
     def __str__(self):
-        return f"Discord:{self.discord_id}"
+        return f"{self.name}:{self.discord_id}"
