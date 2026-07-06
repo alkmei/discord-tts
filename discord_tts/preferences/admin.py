@@ -7,7 +7,6 @@ from .models import UserGuildPreferences
 class UserGuildPreferencesAdmin(admin.ModelAdmin):
     list_display = (
         "account__discord_id",
-        "account__name",
         "voice",
     )
-    search_fields = ("account__discord_id", "account__name")
+    search_fields = ("account__discord_id",)
