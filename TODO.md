@@ -1,6 +1,6 @@
 ## TODO
 
-- [ ] Admins should be able to configure the behavior they want the users to be able to control
+- [x] Admins should be able to configure the behavior they want the users to be able to control
 - [ ] Add testing
 - [x] Make it so some voices can be limited to certain users
 - [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
