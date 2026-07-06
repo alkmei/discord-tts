@@ -6,7 +6,6 @@
 - [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
 - [x] lines do NOT play in order!
 - [x] stop and skip do the same thing (also don't work)
-- [ ] Make simplified way to run the bot without django.
 - [ ] update README and make a CONTRIBUTORS
 - [ ] make DOCS
-- [ ] admin multi submission capabilities
+- [x] admin multi submission capabilities
