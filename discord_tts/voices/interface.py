@@ -3,7 +3,7 @@ from django.db import models
 from discord_tts.voices.models import Voice
 
 
-def get_available_voices(guild_id: int, search: str):
+def get_available_voices(guild_id: int, search: str = ""):
     """Get a list of available voices per guild
 
     Searches by name. If empty, show all.
