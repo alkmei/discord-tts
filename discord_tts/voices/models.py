@@ -30,6 +30,14 @@ class Voice(models.Model):
 
     objects: Manager[Voice] = models.Manager()
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["name", "guild_id"],
+                name="unique_voice_name_per_guild",
+            ),
+        ]
+
     def __str__(self) -> str:
         return self.name
 
@@ -52,14 +60,15 @@ class Voice(models.Model):
             transaction.on_commit(lambda: convert_to_ogg_opus.delay(self.pk))
 
     def regenerate_safetensors(self):
+        if self.guild_id == 0:
+            logger.warning(
+                "Refusing to regenerate safetensors for built-in voice '%s' (id=%s)",
+                self.name,
+                self.pk,
+            )
+            return
+
         from .tasks import generate_safetensors  # noqa: PLC0415
 
         if self.audio_source:
-            audio_path = self.audio_source.path
-            logger.info(
-                "Regenerating safetensor for voice '%s' (id=%s, audio=%s)",
-                self.name,
-                self.pk,
-                audio_path,
-            )
-            generate_safetensors.delay(self.pk, audio_path)
+            generate_safetensors.delay(self.pk)

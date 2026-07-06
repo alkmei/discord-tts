@@ -1,9 +1,9 @@
+import io
 import logging
 import tempfile
 from pathlib import Path
 
 from celery import shared_task
-from django.conf import settings
 from django.core.files.base import ContentFile
 from pocket_tts import export_model_state
 from pydub import AudioSegment
@@ -18,21 +18,21 @@ AUDIO_MAX_MS = 30000
 
 
 @shared_task
-def generate_safetensors(voice_id: int, audio_path: str):
+def generate_safetensors(voice_id: int):
+    voice = Voice.objects.get(id=voice_id)
+
     logger.info(
         "Starting safetensor regeneration for voice_id=%s, audio=%s",
         voice_id,
-        audio_path,
+        voice.audio_source.path,
     )
-
-    voice = Voice.objects.get(id=voice_id)
     model = get_model()
 
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_dir_path = Path(tmp_dir)
 
         try:
-            audio = AudioSegment.from_file(audio_path)
+            audio = AudioSegment.from_file(voice.audio_source.path)
 
             temp_wav_path = tmp_dir_path / "inference_prompt.wav"
             audio.set_frame_rate(22050).set_channels(1).export(
@@ -47,9 +47,12 @@ def generate_safetensors(voice_id: int, audio_path: str):
 
             with safetensor_temp_path.open("rb") as f:
                 voice.processed_safetensor.save(
-                    f"{voice.name}_processed.safetensors",
+                    f"{voice.name}.safetensors",
                     ContentFile(f.read()),
-                    save=True,
+                    save=False,
+                )
+                Voice.objects.filter(pk=voice.pk).update(
+                    processed_safetensor=voice.processed_safetensor.name,
                 )
 
             logger.info(
@@ -67,42 +70,40 @@ def generate_safetensors(voice_id: int, audio_path: str):
 
 
 @shared_task
-def convert_to_ogg_opus(voice_id):
+def convert_to_ogg_opus(voice_id: int):
     try:
         voice = Voice.objects.get(id=voice_id)
-        if not voice.audio_source:
+        if not voice.audio_source or not voice.audio_source.name:
             return
 
-        original_path = voice.audio_source.path
-        ogg_path = f"{Path(original_path).stem}.ogg"
+        old_file_path = voice.audio_source.name
 
-        audio = AudioSegment.from_file(original_path)
+        input_data = io.BytesIO(voice.audio_source.read())
+        audio = AudioSegment.from_file(input_data)
 
-        # Clip to 30 seconds
         if len(audio) > AUDIO_MAX_MS:
             audio = audio[:AUDIO_MAX_MS]
 
-        # Export to Ogg Opus
-        # We specify 'libopus' codec for high quality/low bitrate
+        output_buffer = io.BytesIO()
         audio.export(
-            ogg_path,
+            output_buffer,
             format="ogg",
             codec="libopus",
-            parameters=["-ar", "48000", "-b:a", "32k"],  # Discord-optimized settings
+            parameters=["-ar", "48000", "-b:a", "32k"],
         )
 
-        # Update model
-        # We update the 'name' attribute of the FileField to the new path
-        # This keeps the file in the same directory but points to the .ogg
-        relative_path = str(Path(ogg_path).relative_to(settings.MEDIA_ROOT))
-        voice.audio_source.name = relative_path
-        voice.save(update_fields=["audio_source"])
+        new_filename = f"{Path(voice.audio_source.name).stem}.ogg"
+        voice.audio_source.save(
+            new_filename,
+            ContentFile(output_buffer.getvalue()),
+            save=False,
+        )
+        Voice.objects.filter(pk=voice.pk).update(audio_source=voice.audio_source.name)
 
-        # Cleanup original file if it was different
-        if original_path != ogg_path and Path(original_path).exists():
-            Path(original_path).unlink()
-
-        generate_safetensors.delay(voice.pk, relative_path)
+        if old_file_path != voice.audio_source.name:
+            voice.audio_source.storage.delete(old_file_path)
+            logger.info("Deleted old file: %s", old_file_path)
+        generate_safetensors.delay(voice.pk)
 
         logger.info("Successfully converted Voice %s to Ogg Opus", voice_id)
 
