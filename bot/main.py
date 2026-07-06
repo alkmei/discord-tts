@@ -1,4 +1,6 @@
+import contextlib
 import os
+from typing import cast
 
 import discord
 import django
@@ -59,6 +61,18 @@ class TTSBot(commands.Bot):
             self.user.id,
         )
         await self.tree.sync()
+
+    async def cleanup(self) -> None:
+        """Disconnect from all voice channels."""
+        logger.info("Disconnecting...")
+        for guild in self.guilds:
+            if guild.voice_client:
+                with contextlib.suppress(Exception):
+                    await cast("discord.VoiceClient", guild.voice_client).disconnect()
+
+    async def close(self):
+        await self.cleanup()
+        await super().close()
 
 
 bot = TTSBot()
