@@ -1,5 +1,7 @@
+import asyncio
 import contextlib
 import os
+import signal
 from typing import cast
 
 import discord
@@ -43,6 +45,14 @@ class TTSBot(commands.Bot):
 
     async def setup_hook(self) -> None:
         """Manually load the defined extensions."""
+        loop = asyncio.get_running_loop()
+        with contextlib.suppress(NotImplementedError):
+            # When SIGTERM is received, trigger self.close()
+            # Doesn't work for Windows I think.
+            loop.add_signal_handler(
+                signal.SIGTERM,
+                lambda: asyncio.create_task(self.close()),
+            )
         for extension in self.EXTENSIONS:
             try:
                 await self.load_extension(extension)
