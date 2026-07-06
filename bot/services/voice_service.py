@@ -40,7 +40,5 @@ async def get_effective_voice(
     if requested_voice is not None:
         return requested_voice
 
-    prefs = await sync_to_async(get_user_preferences)(user_id, guild_id)
-    if prefs.voice:
-        return prefs.voice.id
-    return None
+    prefs, _ = await sync_to_async(get_user_preferences)(user_id, guild_id)
+    return prefs.get("voice_id")

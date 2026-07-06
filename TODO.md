@@ -9,3 +9,4 @@
 - [ ] Make simplified way to run the bot without django.
 - [ ] update README and make a CONTRIBUTORS
 - [ ] make DOCS
+- [ ] admin multi submission capabilities

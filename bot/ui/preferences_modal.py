@@ -1,4 +1,3 @@
-from typing import TYPE_CHECKING
 from typing import cast
 
 from discord import Interaction
@@ -7,9 +6,7 @@ from discord.ui import Label
 from discord.ui import Modal
 
 from bot.services.preferences_service import update_preferences
-
-if TYPE_CHECKING:
-    from discord_tts.preferences.models import UserGuildPreferences
+from discord_tts.preferences.interface import UserGuildPreferenceDto as PrefsDto
 
 
 class PreferenceModal(Modal):
@@ -30,23 +27,23 @@ class PreferenceModal(Modal):
         component=Checkbox(),
     )
 
-    def __init__(self, prefs: UserGuildPreferences):
-        self._set_defaults(prefs)
+    def __init__(self, prefs: PrefsDto, admin_prefs: PrefsDto):
+        self._set_defaults(prefs, admin_prefs)
         super().__init__(title="Preferences")
 
-    def _set_defaults(self, prefs: UserGuildPreferences) -> None:
-        cast(
-            "Checkbox",
-            self.introduce_speaker.component,
-        ).default = prefs.introduce_speaker
-        cast(
-            "Checkbox",
-            self.speak_while_muted.component,
-        ).default = prefs.speak_while_muted
-        cast(
-            "Checkbox",
-            self.echo_say_command.component,
-        ).default = prefs.echo_say_command
+    def _set_defaults(self, prefs: PrefsDto, admin_prefs: PrefsDto) -> None:
+        keys = ["introduce_speaker", "speak_while_muted", "echo_say_command"]
+
+        for key in keys:
+            label = getattr(self, key)
+
+            admin_val = admin_prefs.get(key)
+            if admin_val is not None:
+                label.text = f"{label.text} ({admin_val})"
+                label.description = f"{label.description} (controlled by admin)"
+
+            component = cast("Checkbox", label.component)
+            component.default = bool(prefs.get(key, False))
 
     async def on_submit(self, interaction: Interaction):
         if not interaction.guild_id:
@@ -80,21 +77,21 @@ class PreferenceModal(Modal):
         if introduce_speaker is not None:
             intro_text = (
                 "Will now introduce you"
-                if result.introduce_speaker
+                if result.get("introduce_speaker")
                 else "Will no longer introduce you"
             )
             message_parts.append(intro_text)
         if speak_while_muted is not None:
             muted_text = (
                 "Will now speak while muted"
-                if result.speak_while_muted
+                if result.get("speak_while_muted")
                 else "Will no longer speak while muted"
             )
             message_parts.append(muted_text)
         if echo_say_command is not None:
             echo_text = (
                 "Will now echo the /say command"
-                if result.echo_say_command
+                if result.get("echo_say_command")
                 else "Will no longer echo the /say command"
             )
             message_parts.append(echo_text)

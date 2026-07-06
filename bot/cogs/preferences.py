@@ -56,12 +56,12 @@ class PreferencesCog(commands.Cog):
             )
             return
 
-        prefs = await sync_to_async(get_user_preferences)(
+        prefs, admin_prefs = await sync_to_async(get_user_preferences)(
             interaction.user.id,
             interaction.guild_id,
         )
 
-        await interaction.response.send_modal(PreferenceModal(prefs))
+        await interaction.response.send_modal(PreferenceModal(prefs, admin_prefs))
 
 
 async def setup(bot: commands.Bot) -> None:
