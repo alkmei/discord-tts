@@ -35,6 +35,12 @@ class Voice(models.Model):
         null=True,
         blank=True,
     )
+    # If empty, voice is server-wide. Else, it's like a whitelist
+    allowed_users = models.ManyToManyField(
+        "common.DiscordAccount",
+        blank=True,
+        related_name="exclusive_voices",
+    )
 
     objects: Manager[Voice] = models.Manager()
 

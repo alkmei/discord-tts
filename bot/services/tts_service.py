@@ -110,7 +110,11 @@ def clean_tts_text(text: str) -> str:
     return "." + content
 
 
-async def process_multiline_input(text: str, guild_id: int) -> list[tuple[int, str]]:
+async def process_multiline_input(
+    text: str,
+    guild_id: int,
+    discord_id: int,
+) -> list[tuple[int, str]]:
     """Process the input from the multiline modal
 
     Input is in format "<voice_name>: <text>" seperated by newline.
@@ -125,7 +129,8 @@ async def process_multiline_input(text: str, guild_id: int) -> list[tuple[int, s
             voice_names.append(name_part)
 
     voices = await sync_to_async(get_voices_by_name)(
-        guild_id=guild_id,
+        discord_id,
+        guild_id,
         voice_names=voice_names,
     )
 

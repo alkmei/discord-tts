@@ -57,7 +57,7 @@ def update_user_voice(
     account, _ = sync_discord_account(discord_id)
 
     with transaction.atomic():
-        voice = get_voice(guild_id, voice_id)
+        voice = get_voice(discord_id, guild_id, voice_id)
         if not voice:
             return None
 

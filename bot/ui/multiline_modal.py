@@ -47,6 +47,7 @@ class MultilineTTSInputModal(Modal):
         voice_lines = await process_multiline_input(
             multiline_input,
             guild_id=interaction.guild_id,
+            discord_id=interaction.user.id,
         )
 
         for line in voice_lines:

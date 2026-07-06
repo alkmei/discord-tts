@@ -14,6 +14,7 @@ async def voice_autocomplete(
         e = "guild_id should not be None"
         raise ValueError(e)
     voices = await sync_to_async(get_available_voices)(
+        interaction.user.id,
         interaction.guild_id,
         search=current,
     )
