@@ -25,7 +25,7 @@ def dispatch_tts(
     text: str,
     voice_pk: int,
     guild_id: int,
-    channel_id: int | None = None,
+    channel_id: int,
 ):
     cleaned = clean_tts_text(text)
     counter_key = f"guild_line_task_count:{guild_id}"
@@ -54,7 +54,7 @@ def handle_multiline_tts(
     raw_text: str,
     guild_id: int,
     discord_id: int,
-    channel_id: int | None = None,
+    channel_id: int,
 ) -> int:
     """
     Parses "Voice: Text" lines, resolves voices, and dispatches tasks.

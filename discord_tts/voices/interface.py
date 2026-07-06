@@ -31,6 +31,13 @@ def get_available_voices(discord_id: int, guild_id: int, search: str = ""):
     return list(queryset)
 
 
+def get_all_guild_voices(guild_id: int):
+    """Get list per guild, no user whitelist"""
+    return list(
+        Voice.objects.filter(models.Q(guild_id=guild_id) | models.Q(guild_id=0)),
+    )
+
+
 def get_voice(discord_id: int, guild_id: int, voice_pk: int):
     """Get a specific voice, ensuring the user has permission to see it."""
     return (

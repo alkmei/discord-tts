@@ -20,10 +20,12 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import URLPattern
 from django.urls import URLResolver
+from django.urls import include
 from django.urls import path
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
+    path("", include("discord_tts.speech.urls")),
 ]
 
 if settings.DEBUG:
