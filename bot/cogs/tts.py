@@ -6,15 +6,16 @@ from asgiref.sync import sync_to_async
 from discord import app_commands
 from discord.ext import commands
 
-from bot.cogs.speaker import SpeakerCog
 from bot.services.tts_service import resolve_mentions
 from bot.services.tts_service import start_tts_task
+from bot.services.voice_service import get_effective_voice
 from bot.services.voice_service import voice_autocomplete
 from bot.ui.multiline_modal import MultilineTTSInputModal
-from discord_tts.preferences.interface import get_user_preferences
 
 if TYPE_CHECKING:
     from bot.main import TTSBot
+
+    from .speaker import SpeakerCog
 
 
 class TTSCog(commands.Cog):
@@ -60,15 +61,11 @@ class TTSCog(commands.Cog):
 
         resolved = resolve_mentions(text, interaction.guild)
 
-        # TODO: Seperate this part out, also in on_message.
-        effective_voice = voice
-        if effective_voice is None and interaction.user.id:
-            prefs = await sync_to_async(get_user_preferences)(
-                interaction.user.id,
-                interaction.guild_id,
-            )
-            if prefs.voice:
-                effective_voice = prefs.voice.id
+        effective_voice = await get_effective_voice(
+            interaction.user.id,
+            interaction.guild_id,
+            voice,
+        )
 
         start_tts_task(
             resolved,
@@ -188,14 +185,10 @@ class TTSCog(commands.Cog):
 
         resolved = resolve_mentions(message.content, message.guild)
 
-        effective_voice = None
-        if message.author.id:
-            prefs = await sync_to_async(get_user_preferences)(
-                message.author.id,
-                message.guild.id,
-            )
-            if prefs.voice:
-                effective_voice = prefs.voice.id
+        effective_voice = await get_effective_voice(
+            message.author.id,
+            message.guild.id,
+        )
 
         start_tts_task(
             resolved,

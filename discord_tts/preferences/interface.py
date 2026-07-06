@@ -2,6 +2,7 @@ from typing import TypedDict
 
 from django.db import transaction
 
+from discord_tts.common.interface import sync_discord_account
 from discord_tts.voices.interface import get_voice
 
 from .models import UserGuildPreferences
@@ -25,6 +26,8 @@ def update_user_preferences(
     """
     Updates non-voice user preferences.
     """
+    account, _ = sync_discord_account(discord_id)
+
     with transaction.atomic():
         defaults = {k: v for k, v in data.items() if k != "voice_id"}
 
@@ -34,7 +37,7 @@ def update_user_preferences(
         prefs, _ = UserGuildPreferences.objects.select_related(
             "voice",
         ).update_or_create(
-            discord_id=discord_id,
+            account=account,
             guild_id=guild_id,
             defaults={"guild_id": guild_id, **defaults},
         )
@@ -51,13 +54,15 @@ def update_user_voice(
     Updates the user's voice selection.
     Returns the voice name on success, None on failure.
     """
+    account, _ = sync_discord_account(discord_id)
+
     with transaction.atomic():
         voice = get_voice(guild_id, voice_id)
         if not voice:
             return None
 
         UserGuildPreferences.objects.update_or_create(
-            discord_id=discord_id,
+            account=account,
             guild_id=guild_id,
             defaults={"guild_id": guild_id, "voice": voice},
         )
@@ -72,9 +77,11 @@ def get_user_preferences(
     """
     Returns the user preferences, creating if not exists.
     """
+    account, _ = sync_discord_account(discord_id)
+
     with transaction.atomic():
         prefs, _ = UserGuildPreferences.objects.select_related("voice").get_or_create(
-            discord_id=discord_id,
+            account=account,
             defaults={"guild_id": guild_id},
         )
         return prefs

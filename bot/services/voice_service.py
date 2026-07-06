@@ -2,6 +2,7 @@ import discord
 from asgiref.sync import sync_to_async
 from discord import app_commands
 
+from discord_tts.preferences.interface import get_user_preferences
 from discord_tts.voices.interface import get_available_voices
 
 
@@ -23,3 +24,22 @@ async def voice_autocomplete(
         )
         for v in voices
     ]
+
+
+async def get_effective_voice(
+    user_id: int,
+    guild_id: int,
+    requested_voice: int | None = None,
+) -> int | None:
+    """Resolve the effective voice ID for a user.
+
+    If a voice is explicitly requested, return it. Otherwise, fall back to the
+    user's preferred voice from their saved preferences.
+    """
+    if requested_voice is not None:
+        return requested_voice
+
+    prefs = await sync_to_async(get_user_preferences)(user_id, guild_id)
+    if prefs.voice:
+        return prefs.voice.id
+    return None
