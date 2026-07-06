@@ -2,7 +2,7 @@
 
 - [ ] Admins should be able to configure the behavior they want the users to be able to control
 - [ ] Add testing
-- [ ] Make it so some voices can be limited to certain users
+- [x] Make it so some voices can be limited to certain users
 - [x] Seperate voice settings into it's own command, and have a modal manage the rest of the preferences
 - [x] lines do NOT play in order!
 - [x] stop and skip do the same thing (also don't work)
