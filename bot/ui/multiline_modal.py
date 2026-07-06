@@ -1,5 +1,6 @@
 from typing import cast
 
+from asgiref.sync import sync_to_async
 from discord import Embed
 from discord import Interaction
 from discord import TextStyle
@@ -8,8 +9,7 @@ from discord.ui import Label
 from discord.ui import Modal
 from discord.ui import TextInput
 
-from bot.services.tts_service import process_multiline_input
-from bot.services.tts_service import start_tts_task
+from discord_tts.speech.dispatcher import handle_multiline_tts
 
 
 class MultilineTTSInputModal(Modal):
@@ -27,7 +27,7 @@ class MultilineTTSInputModal(Modal):
     echo_checkbox: Label[MultilineTTSInputModal] = Label(
         text="Echo text to the server?",
         description="Will send the script into the text channel",
-        component=Checkbox(),
+        component=Checkbox(default=True),
     )
 
     def __init__(self):
@@ -44,26 +44,24 @@ class MultilineTTSInputModal(Modal):
             )
             return
 
-        voice_lines = await process_multiline_input(
-            multiline_input,
+        queued_count = await sync_to_async(handle_multiline_tts)(
+            raw_text=multiline_input,
             guild_id=interaction.guild_id,
             discord_id=interaction.user.id,
+            channel_id=interaction.channel_id,
         )
 
-        for line in voice_lines:
-            start_tts_task(
-                line[1],
-                line[0],
-                interaction.guild_id,
-                interaction.channel_id,
-            )
-
-        await interaction.response.send_message("Queued messages!", ephemeral=True)
+        await interaction.response.send_message(
+            f"Queued {queued_count} message{'s' if queued_count != 1 else ''}!"
+            if queued_count
+            else "No valid voice lines found",
+            ephemeral=True,
+        )
 
         if echo_to_server:
             # The length limit SHOULD be 4096, which is longer than the input
             embed = Embed(
-                title="Echoed Message",
+                title="Script",
                 description=multiline_input,
                 color=0x0099FF,
             )
