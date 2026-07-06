@@ -28,6 +28,8 @@ class UserGuildPreferences(models.Model):
                 name="unique_user_per_guild",
             ),
         ]
+        verbose_name = "User Admin Preference"
+        verbose_name_plural = "User Admin Preferences"
 
     def __str__(self) -> str:
         return f"{self.account.discord_id} preferences"
@@ -49,6 +51,10 @@ class AdminGuildPreferences(models.Model):
     echo_say_command = models.BooleanField(null=True)
 
     objects: models.Manager[AdminGuildPreferences] = models.Manager()
+
+    class Meta:
+        verbose_name = "Guild Admin Preference"
+        verbose_name_plural = "Guild Admin Preferences"
 
     def __str__(self) -> str:
         return f"Guild {self.guild_id} Preferences"
