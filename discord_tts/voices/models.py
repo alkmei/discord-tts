@@ -12,18 +12,26 @@ if typing.TYPE_CHECKING:
     from django.db.models.manager import Manager
 
 
+def voice_audio_upload_to(instance, filename):
+    return f"{instance.guild_id}/voices/{filename}"
+
+
+def voice_safetensor_upload_to(instance, filename):
+    return f"{instance.guild_id}/safetensors/{filename}"
+
+
 class Voice(models.Model):
     name = models.CharField(max_length=32)
     guild_id = models.PositiveBigIntegerField()
     audio_source = models.FileField(
-        upload_to="voices/",
+        upload_to=voice_audio_upload_to,
         null=True,
         validators=[
             audio_extension_validator,
         ],
     )
     processed_safetensor = models.FileField(
-        upload_to="safetensors/",
+        upload_to=voice_safetensor_upload_to,
         null=True,
         blank=True,
     )
@@ -54,7 +62,7 @@ class Voice(models.Model):
         super().save(*args, **kwargs)
 
         # If a new file was uploaded, trigger conversion
-        if is_new_file:
+        if is_new_file and self.guild_id != 0:
             from .tasks import convert_to_ogg_opus  # noqa: PLC0415
 
             transaction.on_commit(lambda: convert_to_ogg_opus.delay(self.pk))
