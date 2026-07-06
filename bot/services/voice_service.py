@@ -12,7 +12,7 @@ async def voice_autocomplete(
     if not interaction.guild_id:
         e = "guild_id should not be None"
         raise ValueError(e)
-    voices = await sync_to_async(get_available_voices)(interaction.guild_id)
+    voices = await sync_to_async(get_available_voices)(interaction.guild_id, current)
     return [
         app_commands.Choice(
             name=f"{v.name} (System)" if v.guild_id == 0 else v.name,
