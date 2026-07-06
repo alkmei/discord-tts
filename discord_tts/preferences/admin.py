@@ -10,3 +10,8 @@ class UserGuildPreferencesAdmin(admin.ModelAdmin):
         "voice",
     )
     search_fields = ("account__discord_id",)
+
+
+class AdminGuildPreferencesAdmin(admin.ModelAdmin):
+    list_display = ("guild_id",)
+    search_fields = ("guild_id",)
