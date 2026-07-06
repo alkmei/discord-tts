@@ -1,12 +1,10 @@
 # discord-tts
 
-This is still unstable! Expect breaking changes on version updates!
-
 A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, high-quality speech generation. Built with Python for cross-platform compatibility.
 
 ## Features
 
-- Primarily needs `.safetensors` models generated from Pocket-TTS
+- Uses Django's admin panel for managing voices
 - Automatic TTS for muted users
 
 ## Running the Bot
@@ -14,7 +12,6 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 ### Linux/WSL
 
 - Make sure docker is installed
-- Add voices to the `voices` directory
 - Configure `.env` (Discord bot token, etc.)
 - `docker compose up`
 
@@ -31,28 +28,9 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
   3. Placing `.safetensors` files in the `voices` directory
 - `.wav` files may be used (no idea if this works) but are slower; `.safetensors` is strongly recommended.
 
-## Training & Exporting Voices
-
-Use the `export-voices.sh` script to convert supported audio formats to truncated 30s, mono, 44kHz `.wav`, then export to `.safetensors` using Pocket-TTS.
-
-- Bash only (not Windows compatible)
-- Requires `ffmpeg` and Python package `uv`
-- Usage:
-  ```bash
-  ./export-voices.sh <input_file_or_directory> <output_directory>
-  ```
-  Example:
-  ```bash
-  ./export-voices.sh ./samples ./voices
-  ```
-
-The `export_voices.py` script should do the same thing, and is platform independent.
-
-See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for full training details.
-
 ## Dependency & Environment Setup (Summarized)
 
-- Python 3.x required
+- Python 3.14+ required
 - Install dependencies using `uv`:
   ```bash
   uv sync
@@ -63,35 +41,26 @@ See [Pocket-TTS documentation](https://github.com/kyutai-labs/pocket-tts) for fu
 
 ## Bot Commands
 
-- `!join`
-  - Joins the voice channel the caller is in.
-  - Listens for messages from muted users in VC in the channel this command was called in.
-  - Recommend you use this command in a VC adjacent text channel (no idea if the text channels embedded in a VC work)
-- `!voice <voice_name>`
-  - Set your TTS voice
-  - Example: `!voice Joe`
-- `!s <text>`
-  - Speak text directly (no username prefix)
-  - Example: `!s Hello world!`
-- `!prefix <on|off>`
-  - Toggle the 'User says:' prefix (on/off).
-- `!multi`
-  - Used for playing dialog from different voices back to back. Example:
+- `/join` - Join the voice channel you are in and bind to the current text channel
+- `/leave` - Leave the current voice channel
+- `/say` - Make the bot speak text (optional: specify a voice)
+- `/multi` - Open a modal to play multiple voicelines with different voices
+- `/stop` - Stop current playback and clear the queue for the channel
+- `/skip` - Skip the current or next message in the queue
+- `/settings` - Adjust your personal preferences (voice, introduce_speaker)
+
+Script for `multi` command:
 
 ```
-!multi
 alba: Hello everyone! How are you doing?
 marius: I'm doing good!
 ```
-
-> Depends on having `alba.safetensors` and `marius.safetensors` inside the `voices` directory.
 
 - **Automatic TTS:** Muted user’s text messages are spoken aloud in voice channels.
 
 ## WebUI
 
-There's a web ui built with FastAPI + HTMX. It's a really simple UI that will allow you to play text outside of Discord.
-Note that it doesn't have any protection, so be cautious when deploying it publicly.
+There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any protection, so be cautious when deploying it publicly.
 
 ## Links & Resources
 
@@ -106,6 +75,6 @@ Contributions welcome! Please:
 
 - Suggest new features
 - Submit bug reports and pull requests
-- Help extend functionality (such as adding a voice listing command)
+- Help extend functionality
 
 Open an issue or PR on GitHub to get involved.
