@@ -32,7 +32,7 @@ def update_user_preferences(
             return True, UserGuildPreferences()
 
         prefs, _ = UserGuildPreferences.objects.select_related(
-            "voice"
+            "voice",
         ).update_or_create(
             discord_id=discord_id,
             guild_id=guild_id,

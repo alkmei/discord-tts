@@ -22,6 +22,7 @@ INSTALLED_APPS = [
     "discord_tts.preferences",
     "discord_tts.voices",
     "discord_tts.speech",
+    "discord_tts.common",
 ]
 
 MIDDLEWARE = [
