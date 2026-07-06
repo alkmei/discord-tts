@@ -14,7 +14,6 @@ dependencies = [
     "emoji>=2.15.0",
     "pocket-tts>=2.1.0",
     "pydub>=0.25.1",
-    "python-dotenv>=1.1.1",
     "redis>=8.0.1",
     "scipy>=1.17.0",
     "soundfile>=0.14.0",
@@ -24,10 +23,14 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "django-coverage-plugin>=3.2.2",
     "djlint>=1.40.3",
     "flower>=2.0.1",
     "honcho>=2.0.0",
     "mypy>=2.1.0",
+    "pytest>=9.1.1",
+    "pytest-cov>=7.1.0",
+    "python-dotenv>=1.1.1",
     "ruff>=0.15.5",
 ]
 
@@ -120,6 +123,17 @@ plugins = ["mypy_django_plugin.main"]
 
 [tool.django-stubs]
 django_settings_module = "config.settings"
+
+[tool.pytest]
+addopts = ["--ds=config.settings", "--reuse-db", "--import-mode=importlib"]
+minversion = "9.0"
+python_files = ["tests.py", "test_*.py"]
+
+[tool.coverage.run]
+include = ["discord_tts/**"]
+omit = ["*/migrations/*", "*/tests/*"]
+plugins = ["django_coverage_plugin"]
+
 
 [tool.djlint]
 profile = "jinja"
