@@ -25,5 +25,13 @@ class UserGuildPreferences(models.Model):
 
     objects: models.Manager[UserGuildPreferences] = models.Manager()
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["discord_id", "guild_id"],
+                name="unique_user_per_guild",
+            ),
+        ]
+
     def __str__(self) -> str:
         return f"{self.user.username if self.user else 'No user'} - {self.discord_id}"

@@ -7,4 +7,3 @@
 - [x] lines do NOT play in order!
 - [x] stop and skip do the same thing (also don't work)
 - [ ] Make simplified way to run the bot without django.
-- [ ] create dashboard for server admins to manage behavior, add voices, etc...
