@@ -6,9 +6,6 @@ makemigrations:  # Generate migration files
 migrate:  # Apply migrations
 	uv run python manage.py migrate
 
-clearmigrations:  # Delete all migration files
-	find apps -path '*/migrations/*.py' ! -name '__init__.py' -delete
-
 dev:  # Start honcho with Procfile
 	uv run honcho start
 
