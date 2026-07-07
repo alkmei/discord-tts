@@ -13,13 +13,26 @@ A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS
 
 ### Linux/WSL
 
-#### Docker
+#### Docker Compose
 
-Use the 
+- Make sure docker is installed
+- Use the `docker-compose.prod.yml` file as a guide to deploy it.
+
+#### Local/Development
+
+- Make sure docker and uv is installed
+- Use the regular `docker-compose.yml` for Redis.
+- `uv sync`
+- `make migrate`
+- `make dev`
 
 ### Windows
 
 [Download WSL2](https://learn.microsoft.com/en-us/windows/wsl/install), then follow the instructions above.
+
+### IMPORTANT
+
+The Django web ui is NOT meant to be facing the open web!!! Do NOT make it face public!!!
 
 ## Voice Cloning
 
@@ -56,7 +69,7 @@ marius: I'm doing good!
 
 ## Web UI
 
-There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any protection, so be cautious when deploying it publicly.
+There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any protection, so do not expose it to the open web!!!
 
 ## Links & Resources
 
