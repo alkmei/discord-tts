@@ -1,6 +1,6 @@
 [project]
 name = "discord-tts"
-version = "0.1.0"
+version = "1.0.0"
 description = "A Discord TTS using pocket-tts that clones voices."
 readme = "README.md"
 requires-python = ">=3.14"
