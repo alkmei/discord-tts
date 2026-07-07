@@ -3,7 +3,6 @@ import contextlib
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
 from typing import Any
 from typing import TypedDict
 from typing import cast
@@ -14,10 +13,6 @@ from discord.ext import commands
 from discord.voice_client import VoiceClient
 
 from bot.logging import setup_logging
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
 
 logger = setup_logging()
 
@@ -48,27 +43,59 @@ class SpeakerCog(commands.Cog):
         ] = {}  # {guild_id: {seq_num: data}}
         self.expected_seq: dict[int, int] = {}  # {guild_id: next_expected_seq}
         self.waiting_for_syn: dict[int, bool] = {}
+        self._listener_task: asyncio.Task | None = None
 
     async def cog_load(self) -> None:
-        """Start the Redis listener with the cog."""
-        self.bot.loop.create_task(self.redis_listener())
+        """Start the Redis listener safely."""
+        self._listener_task = asyncio.create_task(self.redis_listener())
+
+    async def cog_unload(self) -> None:
+        """Cleanup task when cog is removed or bot reloads."""
+        if self._listener_task:
+            self._listener_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._listener_task
+
+        # Also cancel all playing loops
+        for task in self.playing_tasks.values():
+            task.cancel()
 
     async def redis_listener(self) -> None:
-        """Listen for signals from the worker."""
-        r = aioredis.from_url(self.redis_url)
-        pubsub = r.pubsub()
-        await pubsub.subscribe("tts_play_queue")
+        """Robust listener with automatic reconnection."""
+        while not self.bot.is_closed():
+            try:
+                # Use health_check_interval to prevent Docker from killing idle connections
+                r = aioredis.from_url(
+                    self.redis_url,
+                    decode_responses=True,  # Simplifies JSON handling
+                    health_check_interval=30,
+                )
 
-        listener: AsyncIterator[RedisMessage] = pubsub.listen()
+                async with r.pubsub() as pubsub:
+                    await pubsub.subscribe("tts_play_queue")
+                    logger.info("[REDIS] Subscribed to tts_play_queue")
 
-        async for message in listener:
-            if message["type"] == "message":
-                raw_data = message["data"]
-                if isinstance(raw_data, (bytes, str)):
-                    data: dict[str, Any] = json.loads(raw_data)
-                else:
-                    continue
-                await self.enqueue_audio(data)
+                    async for message in pubsub.listen():
+                        if message["type"] == "message":
+                            try:
+                                data = json.loads(message["data"])
+                                await self.enqueue_audio(data)
+                            except json.JSONDecodeError:
+                                logger.exception("[REDIS] Received invalid JSON")
+                            except Exception as e:
+                                logger.exception(
+                                    "[REDIS] Error processing message: %s",
+                                    e,
+                                )
+
+            except aioredis.ConnectionError, aioredis.TimeoutError:
+                logger.warning("[REDIS] Connection lost. Retrying in 5 seconds...")
+                await asyncio.sleep(5)
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.exception("[REDIS] Unexpected error: %s", e)
+                await asyncio.sleep(5)
 
     async def enqueue_audio(self, data: dict[str, Any]) -> None:
         guild_id = int(data["guild_id"])

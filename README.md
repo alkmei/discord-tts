@@ -19,14 +19,10 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 
 [Download WSL2](https://learn.microsoft.com/en-us/windows/wsl/install), then follow the instructions above.
 
-## Voice System
+## Voice Cloning
 
-- Store custom trained voices in a `voices` directory (create this yourself).
-- Add new voices by:
-  1. Collecting audio samples (`wav`, `mp3`, `flac`, `m4a`, `ogg`, `opus`)
-  2. Using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) and the `export-voices.sh` script to convert/truncate/export
-  3. Placing `.safetensors` files in the `voices` directory
-- `.wav` files may be used (no idea if this works) but are slower; `.safetensors` is strongly recommended.
+- Add new voices by logging into the admin panel and using that to upload audio files.
+- You must log into HuggingFace and accept the agreement in the [model page](https://huggingface.co/kyutai/pocket-tts). Then, provide HF_TOKEN as an environment variable.
 
 ## Dependency & Environment Setup (Summarized)
 
