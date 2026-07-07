@@ -9,9 +9,11 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 APP_DIR = BASE_DIR / "discord_tts"
 
+DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
+
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-key-keep-it-secret")
-DEBUG = True
-ALLOWED_HOSTS = []
+
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
 
 INSTALLED_APPS = [
     "django.contrib.admin",
