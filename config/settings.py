@@ -11,9 +11,15 @@ APP_DIR = BASE_DIR / "discord_tts"
 
 DEBUG = os.getenv("DJANGO_DEBUG", "False") == "True"
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-key-keep-it-secret")
-
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+if not DEBUG:
+    SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")  # Ensure this is set in prod!
+    ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+else:
+    SECRET_KEY = "dev-key-keep-it-secret"
+    ALLOWED_HOSTS = ["*"]
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -30,6 +36,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -76,9 +83,21 @@ CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 
 STATIC_URL = "static/"
+STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
 MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+INSTALLED_APPS += ["compressor"]
+
+STATICFILES_FINDERS = [
+    "django.contrib.staticfiles.finders.FileSystemFinder",
+    "django.contrib.staticfiles.finders.AppDirectoriesFinder",
+    "compressor.finders.CompressorFinder",
+]
+
+COMPRESS_ENABLED = not DEBUG
+COMPRESS_STORAGE = "compressor.storage.CompressorFileStorage"
 
 TTS_SHARED_DIR = os.getenv("TTS_SHARED_DIR", tempfile.gettempdir())
 

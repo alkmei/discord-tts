@@ -6,6 +6,9 @@ set -e
 echo "--- Running Migrations ---"
 python manage.py migrate --noinput
 
+echo "--- Collect Static ---"
+python manage.py collectstatic --noinput
+
 echo "--- Bootstrapping Admin ---"
 if [ -n "$DJANGO_SUPERUSER_USERNAME" ] && [ -n "$DJANGO_SUPERUSER_PASSWORD" ]; then
     python manage.py shell <<'PYTHON'
