@@ -17,6 +17,7 @@ A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS
 
 - Make sure docker is installed
 - Use the `docker-compose.prod.yml` file as a guide to deploy it.
+- If you cloned the repository, use `docker-compose.local.yml` to build and deploy it.
 
 #### Local/Development
 
@@ -38,6 +39,7 @@ The Django web ui is NOT meant to be facing the open web!!! Do NOT make it face 
 
 - You must log into HuggingFace and accept the agreement in the [model page](https://huggingface.co/kyutai/pocket-tts). Then, provide HF_TOKEN as an environment variable.
 - Add new voices by logging into the admin panel and using that to upload audio files.
+- By default, Django's admin will be on `/admin` on port 8000. If the DJANGO_SUPERUSER_USERNAME and DJANGO_SUPERUSER_PASSWORD env variables are filled in, then it will automatically create an admin user of those types.
 
 ## Dependency & Environment Setup
 
