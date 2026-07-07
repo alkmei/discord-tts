@@ -3,7 +3,7 @@ name: Build and Publish Image
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   REGISTRY: ghcr.io
@@ -35,11 +35,13 @@ jobs:
         uses: docker/metadata-action@v5
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          flavor: |
+            latest=false
           tags: |
-            # This strips the 'v' from the tag (v1.0.0 -> 1.0.0)
             type=semver,pattern={{version}}
-            # Always update the latest tag
-            type=raw,value=latest
+
+            # ONLY generate 'latest' if the tag is an exact version (no -rc, -beta, etc)
+            type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v5

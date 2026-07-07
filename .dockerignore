@@ -6,9 +6,15 @@ env/
 # Ignore local audio/model files (these should be mounted via volumes, not baked in)
 voices/
 shared/
+media/
 
 # Ignore git and caches
 .git/
 __pycache__/
 *.pyc
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+.vscode
+db.sqlite3

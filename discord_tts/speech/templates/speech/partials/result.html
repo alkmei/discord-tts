@@ -1,0 +1,33 @@
+<div class="card border-0 bg-light shadow-sm mb-3">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="text-primary mb-0 fw-bold">✅ Queued {{ queued_count }} line(s)</h6>
+            <span class="badge bg-secondary">Guild: {{ guild_id }}</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table table-sm align-middle bg-white rounded">
+                <thead>
+                    <tr class="small text-muted">
+                        <th>#</th>
+                        <th>Voice</th>
+                        <th>Processed Message</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for line in parsed_lines %}
+                        <tr>
+                            <td>{{ line.line_num }}</td>
+                            <td><span class="voice-badge">{{ line.voice }}</span></td>
+                            <td class="small">
+                                {{ line.text }}
+                                {% for warning in line.warnings %}
+                                    <div class="text-danger" style="font-size: 0.75rem;">⚠️ {{ warning }}</div>
+                                {% endfor %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

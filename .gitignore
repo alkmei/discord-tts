@@ -9,12 +9,17 @@ wheels/
 # Virtual environments
 .venv
 .env
-user_voices.json
-voices
 .mypy_cache/
 
 script.txt
 output
 temp_processing
 *.wav
-db
+
+*.log
+
+*.sqlite3
+
+media/
+staticfiles/
+node_modules/
