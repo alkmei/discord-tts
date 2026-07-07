@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING
 from typing import cast
 
 import discord
+from discord import VoiceClient
 from discord import app_commands
 from discord.ext import commands
 
@@ -14,6 +15,32 @@ class VoiceCog(commands.Cog):
 
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = cast("TTSBot", bot)
+
+    @commands.Cog.listener()
+    async def on_voice_state_update(
+        self,
+        member: discord.Member,
+        before: discord.VoiceState,
+        after: discord.VoiceState,
+    ) -> None:
+        """Auto-disconnect when the bot is the only one left in the voice channel."""
+        if not member.guild or not member.guild.voice_client:
+            return
+
+        vc = cast("VoiceClient", member.guild.voice_client)
+        if vc.user and self.bot.user and vc.user.id != self.bot.user.id:
+            return
+
+        if after.channel:
+            return
+
+        non_bot_users = [
+            m for m in (before.channel.members if before.channel else []) if not m.bot
+        ]
+
+        if not non_bot_users:
+            await vc.disconnect()
+            self.bot.bound_channels.pop(member.guild.id, None)
 
     @app_commands.command(name="join", description="Join the voice channel")
     async def join(self, interaction: discord.Interaction) -> None:

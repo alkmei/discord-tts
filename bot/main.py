@@ -40,6 +40,7 @@ class TTSBot(commands.Bot):
             "bot.cogs.speaker",
         ]
         intents = discord.Intents.default()
+        intents.voice_states = True
         self.bound_channels: dict[int, int] = {}  # guild_id: text_channel
         super().__init__(command_prefix="!", intents=intents)
 
