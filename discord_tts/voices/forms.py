@@ -1,4 +1,3 @@
-import soundfile as sf
 from django import forms
 
 from .models import Voice
@@ -28,21 +27,5 @@ class VoiceForm(forms.ModelForm):
                 err = f"Audio file is too large (max {MAX_AUDIO_SIZE_MB}MB).\
                       Tip: audio should be no longer than 30 seconds."
                 raise forms.ValidationError(err)
-
-            # We wrap this in a try/except because if it's not a valid
-            # libsndfile format, soundfile will throw an error.
-            try:
-                # Seek(0) ensures we read from the start of the uploaded file
-                file.seek(0)
-                with sf.SoundFile(file) as _:
-                    pass
-            except Exception as err:
-                msg = (
-                    "Unsupported or corrupt audio format. "
-                    "Please provide a valid libsndfile-compatible file."
-                )
-                raise forms.ValidationError(msg) from err
-            finally:
-                file.seek(0)  # Reset pointer for Django's file saver
 
         return file
