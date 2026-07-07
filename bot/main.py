@@ -41,7 +41,7 @@ class TTSBot(commands.Bot):
         ]
         intents = discord.Intents.default()
         intents.voice_states = True
-        intents.guild_messages = True
+        intents.message_content = True
         self.bound_channels: dict[int, int] = {}  # guild_id: text_channel
         super().__init__(command_prefix="!", intents=intents)
 
