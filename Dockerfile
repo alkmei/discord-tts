@@ -44,8 +44,8 @@ COPY . .
 COPY scripts/ /app/scripts/
 RUN chmod +x /app/scripts/*.sh
 
-# Create directories for voices and shared audio files
-RUN mkdir -p /app/voices /app/shared /app/db
+# Create directories for media and shared audio files
+RUN mkdir -p /app/media /app/shared /app/db
 
 # Set environment variables
 ENV PATH="/app/.venv/bin:$PATH"
