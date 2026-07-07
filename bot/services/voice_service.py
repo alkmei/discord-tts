@@ -23,7 +23,7 @@ async def voice_autocomplete(
             name=f"{v.name} (System)" if v.guild_id == 0 else v.name,
             value=v.pk,
         )
-        for v in voices
+        for v in voices[:25]
     ]
 
 
