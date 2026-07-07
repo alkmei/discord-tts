@@ -10,7 +10,8 @@ services:
       retries: 5
 
   django:
-    image: ghcr.io/alkmei/discord-tts:latest
+    image: discord-tts:latest
+    build: .
     restart: unless-stopped
     entrypoint: ["sh", "scripts/entrypoint.sh"]
     command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
@@ -32,7 +33,7 @@ services:
         condition: service_healthy
 
   celery-worker:
-    image: ghcr.io/alkmei/discord-tts:latest
+    image: discord-tts:latest
     restart: unless-stopped
     entrypoint: ["sh", "scripts/entrypoint.sh"]
     command: ["celery", "-A", "config", "worker", "--loglevel=info"]
@@ -50,7 +51,7 @@ services:
         condition: service_healthy
 
   bot:
-    image: ghcr.io/alkmei/discord-tts:latest
+    image: discord-tts:latest
     restart: unless-stopped
     command: python -m bot.main
     environment:

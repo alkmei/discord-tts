@@ -1,19 +1,21 @@
 # discord-tts
 
-A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, high-quality speech generation. Built with Python for cross-platform compatibility.
+A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS](https://github.com/kyutai-labs/pocket-tts) for fast, CPU based inference.
 
 ## Features
 
-- Uses Django's admin panel for managing voices
-- Automatic TTS for muted users
+- No GPU needed!
+- Voice cloning!
+- Use Django's built-in admin pages to manage voices!
+- Automatic TTS for muted users (if configured with message intent)!
 
 ## Running the Bot
 
 ### Linux/WSL
 
-- Make sure docker is installed
-- Configure `.env` (Discord bot token, etc.)
-- `docker compose up`
+#### Docker
+
+Use the 
 
 ### Windows
 
@@ -21,10 +23,10 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 
 ## Voice Cloning
 
-- Add new voices by logging into the admin panel and using that to upload audio files.
 - You must log into HuggingFace and accept the agreement in the [model page](https://huggingface.co/kyutai/pocket-tts). Then, provide HF_TOKEN as an environment variable.
+- Add new voices by logging into the admin panel and using that to upload audio files.
 
-## Dependency & Environment Setup (Summarized)
+## Dependency & Environment Setup
 
 - Python 3.14+ required
 - Install dependencies using `uv`:
@@ -32,8 +34,7 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
   uv sync
   ```
 - Install ffmpeg (see [ffmpeg download page](https://ffmpeg.org/download.html))
-- Create a `voices` directory and add your models
-- Place your Discord bot token and config in a `.env` file
+- Copy the `.env.example` to the `.env` file and fill in the information.
 
 ## Bot Commands
 
@@ -45,16 +46,15 @@ A Discord bot providing real-time Text-to-Speech (TTS) in voice channels using [
 - `/skip` - Skip the current or next message in the queue
 - `/settings` - Adjust your personal preferences (voice, introduce_speaker)
 
-Script for `multi` command:
+Format for `multi` command:
 
 ```
+<voice_name>: <text>
 alba: Hello everyone! How are you doing?
 marius: I'm doing good!
 ```
 
-- **Automatic TTS:** Muted user’s text messages are spoken aloud in voice channels.
-
-## WebUI
+## Web UI
 
 There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any protection, so be cautious when deploying it publicly.
 
