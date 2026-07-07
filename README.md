@@ -31,10 +31,6 @@ A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS
 
 [Download WSL2](https://learn.microsoft.com/en-us/windows/wsl/install), then follow the instructions above.
 
-### IMPORTANT
-
-The Django web ui is NOT meant to be facing the open web!!! Do NOT make it face public!!!
-
 ## Voice Cloning
 
 - You must log into HuggingFace and accept the agreement in the [model page](https://huggingface.co/kyutai/pocket-tts). Then, provide HF_TOKEN as an environment variable.
@@ -59,7 +55,8 @@ The Django web ui is NOT meant to be facing the open web!!! Do NOT make it face 
 - `/multi` - Open a modal to play multiple voicelines with different voices
 - `/stop` - Stop current playback and clear the queue for the channel
 - `/skip` - Skip the current or next message in the queue
-- `/settings` - Adjust your personal preferences (voice, introduce_speaker)
+- `/settings` - Adjust your personal preferences
+- `/voice` - Change your selected voice
 
 Format for `multi` command:
 
@@ -71,7 +68,7 @@ marius: I'm doing good!
 
 ## Web UI
 
-There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any protection, so do not expose it to the open web!!!
+There's a web ui in Django, hosted in `/` if you run the default server. It's a really simple UI that will allow you to play text outside of Discord. Note that it doesn't have any authentication nor authorization, so do not expose it to the open web!!!
 
 ## Links & Resources
 

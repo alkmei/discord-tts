@@ -13,7 +13,17 @@ services:
     image: ghcr.io/alkmei/discord-tts:latest
     restart: unless-stopped
     entrypoint: ["sh", "scripts/entrypoint.sh"]
-    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    command:
+      [
+        "uvicorn",
+        "config.asgi:application",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+        "--workers",
+        "1",
+      ]
     environment:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
