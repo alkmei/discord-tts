@@ -7,6 +7,7 @@ from bot.services.preferences_service import update_user_voice
 from bot.services.voice_service import voice_autocomplete
 from bot.ui.preferences_modal import PreferenceModal
 from discord_tts.preferences.interface import get_user_preferences
+from discord_tts.voices.interface import get_available_voices
 
 
 class PreferencesCog(commands.Cog):
@@ -40,6 +41,32 @@ class PreferencesCog(commands.Cog):
         message = f"Updated voice to `{result}`."
         await interaction.response.send_message(
             message,
+            ephemeral=True,
+        )
+
+    @app_commands.command(name="voices", description="List all available voices")
+    async def voices(self, interaction: discord.Interaction) -> None:
+        """List available voices"""
+        if not interaction.user.id or not interaction.guild_id:
+            await interaction.response.send_message(
+                "Failed to list voices",
+                ephemeral=True,
+            )
+            return
+        voices = await sync_to_async(get_available_voices)(
+            interaction.user.id,
+            interaction.guild_id,
+        )
+
+        if len(voices) == 0:
+            await interaction.response.send_message(
+                "No voices :(",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.send_message(
+            "```\n" + ", ".join([voice.name for voice in voices]) + "\n```",
             ephemeral=True,
         )
 
