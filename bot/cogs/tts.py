@@ -2,7 +2,6 @@ from typing import TYPE_CHECKING
 from typing import cast
 
 import discord
-from asgiref.sync import sync_to_async
 from discord import app_commands
 from discord.ext import commands
 

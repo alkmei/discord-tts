@@ -86,6 +86,7 @@ def get_user_preferences(
     with transaction.atomic():
         prefs, _ = UserGuildPreferences.objects.select_related("voice").get_or_create(
             account=account,
+            guild_id=guild_id,
             defaults={"guild_id": guild_id},
         )
         admin_prefs, _ = AdminGuildPreferences.objects.get_or_create(
