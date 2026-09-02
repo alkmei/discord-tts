@@ -2,7 +2,6 @@ import asyncio
 import contextlib
 import json
 import os
-from pathlib import Path
 from typing import Any
 from typing import TypedDict
 from typing import cast
@@ -13,6 +12,7 @@ from discord.ext import commands
 from discord.voice_client import VoiceClient
 
 from bot.logging import setup_logging
+from bot.services.stream import RedisAudioStream
 
 logger = setup_logging()
 
@@ -172,14 +172,55 @@ class SpeakerCog(commands.Cog):
 
             # Play the audio
             channel_id = int(data["channel_id"])
-            file_path = data["file_path"]
-            await self.execute_play(guild_id, channel_id, file_path)
+            stream_key = data["stream_key"]
+            await self.execute_play(guild_id, channel_id, stream_key)
+
+    async def _cleanup_stream(self, stream_key: str) -> None:
+        try:
+            r = aioredis.from_url(self.redis_url)
+            await r.delete(stream_key)
+            await r.aclose()
+        except Exception:
+            logger.exception("[PLAYBACK] Failed to cleanup stream %s", stream_key)
+
+    async def _reconnect_voice_client(
+        self,
+        guild: discord.Guild,
+        guild_id: int,
+        channel_id: int,
+        stream_key: str,
+    ) -> VoiceClient | None:
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            return None
+
+        paused_event = asyncio.Event()
+        reconnect_task = self.bot.loop.create_task(
+            self._wait_reconnect(guild, paused_event),
+        )
+        try:
+            await asyncio.wait_for(
+                paused_event.wait(),
+                timeout=QUEUE_RECONNECT_TIMEOUT,
+            )
+            reconnect_task.cancel()
+        except TimeoutError:
+            with contextlib.suppress(KeyError):
+                while not self.queues[guild_id].empty():
+                    self.queues[guild_id].get_nowait()
+            await self._cleanup_stream(stream_key)
+            return None
+
+        vc = guild.voice_client
+        if not isinstance(vc, VoiceClient) or not vc.is_connected():
+            return None
+        return vc
 
     async def execute_play(
         self,
         guild_id: int,
         channel_id: int,
-        file_path: str,
+        stream_key: str,
     ) -> None:
         """Handles the actual Discord voice playback."""
         guild = self.bot.get_guild(guild_id)
@@ -188,55 +229,30 @@ class SpeakerCog(commands.Cog):
 
         vc = guild.voice_client
         if not vc:
-            channel = self.bot.get_channel(channel_id)
-            if channel is None:
-                return
-
-            # Pause the queue for specified time to allow bot reconnection
-            paused_event = asyncio.Event()
-            reconnect_task = self.bot.loop.create_task(
-                self._wait_reconnect(guild, paused_event),
+            vc = await self._reconnect_voice_client(
+                guild,
+                guild_id,
+                channel_id,
+                stream_key,
             )
-
-            # Wait for reconnection or timeout
-            try:
-                await asyncio.wait_for(
-                    paused_event.wait(),
-                    timeout=QUEUE_RECONNECT_TIMEOUT,
-                )
-                reconnect_task.cancel()
-            except TimeoutError:
-                # Timeout expired, clear queue and exit
-                with contextlib.suppress(KeyError):
-                    while not self.queues[guild_id].empty():
-                        self.queues[guild_id].get_nowait()
-                return
-
-            vc = guild.voice_client
-
-            if not isinstance(vc, VoiceClient) or not vc.is_connected():
+            if not vc:
                 return
 
         # Play audio and wait for it to finish
         if isinstance(vc, VoiceClient) and not vc.is_playing():
             done = asyncio.Event()
+            stream = RedisAudioStream(self.redis_url, stream_key)
 
             def after_playing(error: Exception | None) -> None:
                 if error:
                     logger.error("[PLAYBACK] Player error", extra={"error": error})
-                try:
-                    fp = Path(file_path)
-                    if fp.exists():
-                        fp.unlink()
-                except Exception as e:
-                    logger.exception(
-                        "[PLAYBACK] Failed to delete %s",
-                        file_path,
-                        extra={"error": e},
-                    )
+                stream.close()
                 self.bot.loop.call_soon_threadsafe(done.set)
 
-            vc.play(discord.FFmpegPCMAudio(file_path), after=after_playing)
+            vc.play(
+                discord.FFmpegPCMAudio(stream, pipe=True),
+                after=after_playing,
+            )
 
             await done.wait()
 
@@ -258,33 +274,40 @@ class SpeakerCog(commands.Cog):
             and cast("VoiceClient", guild.voice_client).is_playing()
         ):
             # Calling stop() triggers the 'after' callback in execute_play,
-            # which sets the 'done' event and allows the loop to continue.
+            # which closes the stream and sets the 'done' event.
             cast("VoiceClient", guild.voice_client).stop()
             return True
         return False
 
     async def stop_audio(self, guild_id: int) -> None:
         """Stops current audio and clears all pending queues/buffers."""
+        r = aioredis.from_url(self.redis_url)
+        keys_to_delete: list[str] = []
+
         # Clear the playback queue
         if guild_id in self.queues:
             queue = self.queues[guild_id]
             while not queue.empty():
                 try:
                     data = queue.get_nowait()
-                    # Clean up the files that were never played
-                    fp = Path(data["file_path"])
-                    if fp.exists():
-                        fp.unlink()
+                    keys_to_delete.append(data["stream_key"])
                 except asyncio.QueueEmpty:
                     break
 
         # Clear the re-ordering buffer
         if guild_id in self.buffers:
-            for data in self.buffers[guild_id].values():
-                fp = Path(data["file_path"])
-                if fp.exists():
-                    fp.unlink()
+            keys_to_delete.extend(
+                data["stream_key"] for data in self.buffers[guild_id].values()
+            )
             self.buffers[guild_id].clear()
+
+        # Batch delete all unconsumed stream keys
+        if keys_to_delete:
+            try:
+                await r.delete(*keys_to_delete)
+            except Exception:
+                logger.exception("[PLAYBACK] Failed to delete stopped streams")
+        await r.aclose()
 
         # Reset sequencing logic
         self.expected_seq[guild_id] = 0

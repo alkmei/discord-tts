@@ -21,13 +21,11 @@ services:
       - REDIS_URL=redis://redis:6379/
       - DJANGO_SUPERUSER_USERNAME=${DJANGO_SUPERUSER_USERNAME}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
-      - TTS_SHARED_DIR=/app/shared
     ports:
       - "8000:8000"
     volumes:
       - db-data:/app/db
       - media-data:/app/media
-      - shared-data:/app/shared
     depends_on:
       redis:
         condition: service_healthy
@@ -41,11 +39,9 @@ services:
       - DJANGO_SECRET_KEY=${DJANGO_SECRET_KEY}
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - REDIS_URL=redis://redis:6379/
-      - TTS_SHARED_DIR=/app/shared
     volumes:
       - db-data:/app/db
       - media-data:/app/media
-      - shared-data:/app/shared
     depends_on:
       redis:
         condition: service_healthy
@@ -57,11 +53,9 @@ services:
     environment:
       - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
       - REDIS_URL=redis://redis:6379/
-      - TTS_SHARED_DIR=/app/shared
     volumes:
       - db-data:/app/db
       - media-data:/app/media
-      - shared-data:/app/shared
     depends_on:
       redis:
         condition: service_healthy
@@ -69,4 +63,3 @@ services:
 volumes:
   db-data:
   media-data:
-  shared-data:
