@@ -19,11 +19,20 @@ redis_client = redis.from_url(settings.CELERY_BROKER_URL)
 
 
 @lru_cache(maxsize=4)
-def get_cached_voice_state(voice_pk):
+def get_cached_voice_state(voice_pk, guild_id=None):
     """Loads voice state from disk using Django ORM."""
     model = get_model()
     try:
         voice = Voice.objects.get(pk=voice_pk)
+        if guild_id is not None and voice.guild_id not in (0, guild_id):
+            logger.warning(
+                "Voice pk=%s (guild=%s) is not available in guild %s,"
+                " using internal default.",
+                voice_pk,
+                voice.guild_id,
+                guild_id,
+            )
+            return model.get_state_for_audio_prompt("alba")
     except Voice.DoesNotExist:
         logger.warning("Voice pk=%s not found, using internal default.", voice_pk)
         return model.get_state_for_audio_prompt("alba")
@@ -60,7 +69,7 @@ def generate_tts_task(
 
     try:
         model = get_model()
-        voice_state = get_cached_voice_state(voice_pk)
+        voice_state = get_cached_voice_state(voice_pk, guild_id)
 
         audio_tensor = model.generate_audio(voice_state, text)
 
