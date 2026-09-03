@@ -22,9 +22,15 @@ class UserGuildPreferences(models.Model):
     objects: models.Manager[UserGuildPreferences] = models.Manager()
 
     class Meta:
+        indexes = [
+            models.Index(
+                fields=["account", "guild_id"],
+                name="user_guild_pref_acc_guild_idx",
+            ),
+        ]
         constraints = [
             models.UniqueConstraint(
-                fields=["account_id", "guild_id"],
+                fields=["account", "guild_id"],
                 name="unique_user_per_guild",
             ),
         ]

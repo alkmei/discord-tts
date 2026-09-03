@@ -7,10 +7,15 @@ from .models import UserGuildPreferences
 @admin.register(UserGuildPreferences)
 class UserGuildPreferencesAdmin(admin.ModelAdmin):
     list_display = (
-        "account__discord_id",
+        "account",
+        "guild_id",
         "voice",
     )
-    search_fields = ("account__discord_id",)
+    list_filter = ("guild_id",)
+    search_fields = (
+        "account__discord_id",
+        "guild_id",
+    )
 
 
 @admin.register(AdminGuildPreferences)
