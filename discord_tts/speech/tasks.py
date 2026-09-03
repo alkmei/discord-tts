@@ -2,10 +2,9 @@ import json
 import logging
 import uuid
 from functools import lru_cache
-from pathlib import Path
 
+import numpy as np
 import redis
-import scipy.io.wavfile
 from celery import shared_task
 from django.conf import settings
 
@@ -17,13 +16,24 @@ logger = logging.getLogger(__name__)
 
 redis_client = redis.from_url(settings.CELERY_BROKER_URL)
 
+STREAM_TTL_SECONDS = 120
+
 
 @lru_cache(maxsize=4)
-def get_cached_voice_state(voice_pk):
+def get_cached_voice_state(voice_pk, guild_id=None):
     """Loads voice state from disk using Django ORM."""
     model = get_model()
     try:
         voice = Voice.objects.get(pk=voice_pk)
+        if guild_id is not None and voice.guild_id not in (0, guild_id):
+            logger.warning(
+                "Voice pk=%s (guild=%s) is not available in guild %s,"
+                " using internal default.",
+                voice_pk,
+                voice.guild_id,
+                guild_id,
+            )
+            return model.get_state_for_audio_prompt("alba")
     except Voice.DoesNotExist:
         logger.warning("Voice pk=%s not found, using internal default.", voice_pk)
         return model.get_state_for_audio_prompt("alba")
@@ -54,39 +64,58 @@ def generate_tts_task(
     syn: bool = False,
 ):
     """
-    Generates audio, saves to shared volume, and signals the bot.
+    Streams audio chunks to Redis as they are generated.
     """
     counter_key = f"guild_line_task_count:{guild_id}"
+    stream_key = f"tts_stream:{guild_id}:{uuid.uuid4().hex[:8]}"
 
     try:
         model = get_model()
-        voice_state = get_cached_voice_state(voice_pk)
+        voice_state = get_cached_voice_state(voice_pk, guild_id)
 
-        audio_tensor = model.generate_audio(voice_state, text)
-
-        filename = f"{guild_id}_{channel_id}_{uuid.uuid4().hex[:8]}.wav"
-        output_path = Path(settings.TTS_SHARED_DIR) / filename
-
-        scipy.io.wavfile.write(
-            output_path,
-            model.sample_rate,
-            audio_tensor.cpu().numpy(),
-        )
-
+        # Publish control signal FIRST so the bot can set up its pipeline
         payload = {
             "guild_id": guild_id,
             "channel_id": channel_id,
-            "file_path": str(output_path),
+            "stream_key": stream_key,
+            "sample_rate": model.sample_rate,
+            "channels": 1,
             "seq": seq,
             "syn": syn,
         }
 
         try:
             redis_client.publish("tts_play_queue", json.dumps(payload))
-            logger.info("Published TTS signal for guild %i to Redis.", guild_id)
+            logger.info("Published TTS stream signal for guild %i.", guild_id)
         except Exception as e:
             logger.exception("Failed to publish Redis signal", extra={"error": e})
-            output_path.unlink(missing_ok=True)
             raise
+
+        # Stream audio chunks as raw PCM with clipping to prevent wrap-around
+        for audio_chunk in model.generate_audio_stream(voice_state, text):
+            arr = audio_chunk.cpu().numpy()
+            pcm_bytes = (
+                np.clip(arr * 32767.0, -32768.0, 32767.0).astype("<i2").tobytes()
+            )
+            redis_client.rpush(stream_key, pcm_bytes)
+
+        # Signal end of stream
+        redis_client.rpush(stream_key, b"EOF")
+        redis_client.expire(stream_key, STREAM_TTL_SECONDS)
+
+        logger.info(
+            "Finished streaming TTS for guild %i, key=%s.",
+            guild_id,
+            stream_key,
+        )
+
+    except Exception:
+        # Push EOF on error so the bot's stream doesn't hang
+        try:
+            redis_client.rpush(stream_key, b"EOF")
+            redis_client.expire(stream_key, STREAM_TTL_SECONDS)
+        except Exception:
+            logger.exception("Failed to push EOF on error for %s", stream_key)
+        raise
     finally:
         redis_client.decr(counter_key)

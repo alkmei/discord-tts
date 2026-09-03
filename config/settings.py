@@ -1,5 +1,4 @@
 import os
-import tempfile
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -99,8 +98,6 @@ STATICFILES_FINDERS = [
 
 COMPRESS_ENABLED = not DEBUG
 COMPRESS_STORAGE = "compressor.storage.CompressorFileStorage"
-
-TTS_SHARED_DIR = os.getenv("TTS_SHARED_DIR", tempfile.gettempdir())
 
 LOGGING = {
     "version": 1,
