@@ -1,57 +1,92 @@
-import struct
 import threading
 import time
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import discord
+import numpy as np
+
+from bot.services.stream import PrimedAudioSource
 from bot.services.stream import RedisAudioStream
-from discord_tts.speech.tasks import _wav_header
 
-WAV_HEADER_SIZE = 44
-FMT_CHUNK_SIZE = 16
-PCM_FORMAT = 1
-SAMPLE_RATE_24K = 24000
-BITS_16 = 16
-DATA_SIZE_STREAMING = 0xFFFFFFFF
 CHUNK_4_BYTES = 4
+INT16_MIN = -32768
+INT16_MAX = 32767
 
 
-def test_wav_header_structure():
-    header = _wav_header(
-        sample_rate=SAMPLE_RATE_24K,
-        num_channels=1,
-        bits_per_sample=BITS_16,
-    )
-    assert len(header) == WAV_HEADER_SIZE
+def test_sample_clipping_prevents_overflow():
+    """Verify float audio is clamped to avoid int16 wrap-around."""
+    raw_floats = np.array([-1.5, -1.0, -0.5, 0.0, 0.5, 1.0, 1.5], dtype=np.float32)
 
-    (
-        riff_tag,
-        _riff_size,
-        wave_tag,
-        fmt_tag,
-        fmt_size,
-        audio_format,
-        channels,
-        sample_rate,
-        byte_rate,
-        block_align,
-        bits_per_sample,
-        data_tag,
-        data_size,
-    ) = struct.unpack("<4sI4s4sIHHIIHH4sI", header)
+    # Without clipping, 1.5 * 32767 wraps to negative
+    unclipped = (raw_floats * 32767).astype("<i2")
+    assert unclipped[-1] < 0
 
-    assert riff_tag == b"RIFF"
-    assert wave_tag == b"WAVE"
-    assert fmt_tag == b"fmt "
-    assert fmt_size == FMT_CHUNK_SIZE
-    assert audio_format == PCM_FORMAT
-    assert channels == 1
-    assert sample_rate == SAMPLE_RATE_24K
-    assert bits_per_sample == BITS_16
-    assert byte_rate == SAMPLE_RATE_24K * 1 * BITS_16 // 8
-    assert block_align == 1 * BITS_16 // 8
-    assert data_tag == b"data"
-    assert data_size == DATA_SIZE_STREAMING
+    # With clipping, values stay within [-32768, 32767]
+    clipped = np.clip(raw_floats * 32767.0, -32768.0, 32767.0).astype("<i2")
+    assert clipped[0] == INT16_MIN
+    assert clipped[-1] == INT16_MAX
+    assert clipped[3] == 0
+
+
+def test_redis_audio_stream_wait_until_ready_threshold():
+    """Verify wait_until_ready unblocks when prebuffer_bytes threshold is met."""
+    chunks = [
+        (b"key", b"chunk1_1234"),
+        (b"key", b"chunk2_5678"),
+        (b"key", b"chunk3_9012"),
+    ]
+    mock_redis = MagicMock()
+    mock_redis.blpop.side_effect = chunks
+
+    with patch("redis.from_url", return_value=mock_redis):
+        stream = RedisAudioStream(
+            "redis://localhost:6379/0",
+            "test_key",
+            prebuffer_bytes=11,
+        )
+        ready = stream.wait_until_ready(timeout=2.0)
+        assert ready is True
+        stream.close()
+
+
+def test_redis_audio_stream_wait_until_ready_eof():
+    """Verify wait_until_ready unblocks when EOF arrives before threshold."""
+    chunks = [
+        (b"key", b"hi"),
+        (b"key", b"EOF"),
+    ]
+    mock_redis = MagicMock()
+    mock_redis.blpop.side_effect = chunks
+
+    with patch("redis.from_url", return_value=mock_redis):
+        stream = RedisAudioStream(
+            "redis://localhost:6379/0",
+            "test_key",
+            prebuffer_bytes=1000,
+        )
+        ready = stream.wait_until_ready(timeout=2.0)
+        assert ready is True
+        assert stream.is_eof is True
+        data = stream.read()
+        assert data == b"hi"
+        stream.close()
+
+
+def test_primed_audio_source():
+    """Verify PrimedAudioSource pre-reads the first frame on initialization."""
+    mock_source = MagicMock(spec=discord.AudioSource)
+    mock_source.read.side_effect = [b"frame1", b"frame2", b""]
+    mock_source.is_opus.return_value = False
+
+    primed = PrimedAudioSource(mock_source)
+    assert mock_source.read.call_count == 1
+    assert primed.read() == b"frame1"
+    assert primed.read() == b"frame2"
+    assert primed.read() == b""
+
+    primed.cleanup()
+    mock_source.cleanup.assert_called_once()
 
 
 def test_redis_audio_stream_reads_chunks_until_eof():

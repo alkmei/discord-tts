@@ -12,6 +12,7 @@ from discord.ext import commands
 from discord.voice_client import VoiceClient
 
 from bot.logging import setup_logging
+from bot.services.stream import PrimedAudioSource
 from bot.services.stream import RedisAudioStream
 
 logger = setup_logging()
@@ -173,7 +174,15 @@ class SpeakerCog(commands.Cog):
             # Play the audio
             channel_id = int(data["channel_id"])
             stream_key = data["stream_key"]
-            await self.execute_play(guild_id, channel_id, stream_key)
+            sample_rate = int(data.get("sample_rate", 24000))
+            channels = int(data.get("channels", 1))
+            await self.execute_play(
+                guild_id,
+                channel_id,
+                stream_key,
+                sample_rate=sample_rate,
+                channels=channels,
+            )
 
     async def _cleanup_stream(self, stream_key: str) -> None:
         try:
@@ -221,6 +230,8 @@ class SpeakerCog(commands.Cog):
         guild_id: int,
         channel_id: int,
         stream_key: str,
+        sample_rate: int = 24000,
+        channels: int = 1,
     ) -> None:
         """Handles the actual Discord voice playback."""
         guild = self.bot.get_guild(guild_id)
@@ -243,18 +254,28 @@ class SpeakerCog(commands.Cog):
             done = asyncio.Event()
             stream = RedisAudioStream(self.redis_url, stream_key)
 
+            # Wait for jitter pre-buffer before starting playback
+            await asyncio.to_thread(stream.wait_until_ready, 5.0)
+
             def after_playing(error: Exception | None) -> None:
                 if error:
                     logger.error("[PLAYBACK] Player error", extra={"error": error})
                 stream.close()
                 self.bot.loop.call_soon_threadsafe(done.set)
 
-            vc.play(
-                discord.FFmpegPCMAudio(stream, pipe=True),
-                after=after_playing,
-            )
+            try:
+                raw_source = discord.FFmpegPCMAudio(
+                    stream,
+                    pipe=True,
+                    before_options=f"-f s16le -ar {sample_rate} -ac {channels}",
+                )
+                source = PrimedAudioSource(raw_source)
 
-            await done.wait()
+                vc.play(source, after=after_playing)
+                await done.wait()
+            finally:
+                stream.close()
+                await self._cleanup_stream(stream_key)
 
     async def _wait_reconnect(self, guild: discord.Guild, event: asyncio.Event) -> None:
         """Wait for the bot to reconnect to the voice channel."""
