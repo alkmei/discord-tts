@@ -52,3 +52,10 @@ def get_voices_by_name(discord_id: int, guild_id: int, voice_names: list[str]):
             name__in=voice_names,
         ),
     )
+
+
+def reset_voice_cache(voice_pk: int | None = None) -> None:
+    """Reset the voice cache in speech tasks."""
+    from discord_tts.speech.tasks import reset_voice_cache as _reset  # noqa: PLC0415
+
+    _reset(voice_pk)

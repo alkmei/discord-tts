@@ -59,19 +59,41 @@ class Voice(models.Model):
         # Check if this is a new file upload
         is_new_file = False
         if self.pk:
-            old_file = Voice.objects.get(pk=self.pk).audio_source
-            if self.audio_source and self.audio_source != old_file:
+            old_voice = Voice.objects.filter(pk=self.pk).first()
+            if old_voice:
+                old_file = old_voice.audio_source
+                if self.audio_source and self.audio_source != old_file:
+                    is_new_file = True
+                    if old_voice.processed_safetensor:
+                        old_voice.processed_safetensor.delete(save=False)
+                    self.processed_safetensor = None
+            else:
                 is_new_file = True
         else:
             is_new_file = True
 
         super().save(*args, **kwargs)
 
-        # If a new file was uploaded, trigger conversion
-        if is_new_file and self.guild_id != 0:
-            from .tasks import convert_to_ogg_opus  # noqa: PLC0415
+        if is_new_file:
+            from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
 
-            transaction.on_commit(lambda: convert_to_ogg_opus.delay(self.pk))
+            reset_voice_cache(self.pk)
+
+            # If a new file was uploaded, trigger conversion
+            if self.guild_id != 0:
+                from .tasks import convert_to_ogg_opus  # noqa: PLC0415
+
+                transaction.on_commit(lambda: convert_to_ogg_opus.delay(self.pk))
+
+    def delete(self, *args, **kwargs):
+        voice_pk = self.pk
+        if self.processed_safetensor:
+            self.processed_safetensor.delete(save=False)
+        result = super().delete(*args, **kwargs)
+        from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
+
+        reset_voice_cache(voice_pk)
+        return result
 
     def regenerate_safetensors(self):
         if self.guild_id == 0:
@@ -82,7 +104,10 @@ class Voice(models.Model):
             )
             return
 
+        from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
+
         from .tasks import generate_safetensors  # noqa: PLC0415
 
+        reset_voice_cache(self.pk)
         if self.audio_source:
             generate_safetensors.delay(self.pk)

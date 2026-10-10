@@ -70,9 +70,15 @@ def generate_safetensors(voice_id: int):
             voice.processed_safetensor.storage.delete(old_safetensor_path)
             logger.info("Deleted old safetensor: %s", old_safetensor_path)
 
+        from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
+
+        reset_voice_cache(voice.pk)
         logger.info("Successfully generated safetensors for Voice %s", voice_id)
 
     except Exception:
+        from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
+
+        reset_voice_cache(voice_id)
         logger.exception("Error generating safetensors for voice %s", voice_id)
         raise
 
@@ -115,6 +121,9 @@ def convert_to_ogg_opus(voice_id: int):
             voice.audio_source.storage.delete(old_file_full_path)
             logger.info("Deleted old file %s", old_file_full_path)
 
+        from discord_tts.speech.tasks import reset_voice_cache  # noqa: PLC0415
+
+        reset_voice_cache(voice.pk)
         generate_safetensors.delay(voice.pk)
         logger.info("Successfully converted Voice %s to Ogg Opus", voice_id)
 

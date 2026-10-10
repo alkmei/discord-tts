@@ -2,6 +2,7 @@ import json
 import logging
 import uuid
 from functools import lru_cache
+from pathlib import Path
 
 import numpy as np
 import redis
@@ -20,9 +21,47 @@ STREAM_TTL_SECONDS = 120
 
 
 @lru_cache(maxsize=4)
-def get_cached_voice_state(voice_pk, guild_id=None):
-    """Loads voice state from disk using Django ORM."""
+def _load_voice_state_cached(target_path: str, mtime: float):
+    """Loads voice state from disk or builtin prompt using Pocket-TTS model."""
     model = get_model()
+    return model.get_state_for_audio_prompt(target_path)
+
+
+def reset_voice_cache(voice_pk: int | None = None) -> None:
+    """Reset the cached voice state so the bot loads the new safetensors/audio."""
+    _load_voice_state_cached.cache_clear()
+    logger.info("Reset voice cache (voice_pk=%s)", voice_pk)
+
+
+def _resolve_target_path(voice: Voice) -> str | None:
+    """Finds the path to the processed safetensors or fallback audio source."""
+    if voice.processed_safetensor:
+        try:
+            p = Path(voice.processed_safetensor.path)
+            if p.exists():
+                return str(p)
+        except Exception:
+            logger.exception(
+                "Error checking processed_safetensor path for voice %s",
+                voice.pk,
+            )
+
+    if voice.audio_source:
+        try:
+            p = Path(voice.audio_source.path)
+            if p.exists():
+                return str(p)
+        except Exception:
+            logger.exception(
+                "Error checking audio_source path for voice %s",
+                voice.pk,
+            )
+
+    return None
+
+
+def get_cached_voice_state(voice_pk: int, guild_id: int | None = None):
+    """Loads voice state from disk using Django ORM."""
     try:
         voice = Voice.objects.get(pk=voice_pk)
         if guild_id is not None and voice.guild_id not in (0, guild_id):
@@ -33,25 +72,32 @@ def get_cached_voice_state(voice_pk, guild_id=None):
                 voice.guild_id,
                 guild_id,
             )
-            return model.get_state_for_audio_prompt("alba")
+            return _load_voice_state_cached("alba", 0.0)
     except Voice.DoesNotExist:
         logger.warning("Voice pk=%s not found, using internal default.", voice_pk)
-        return model.get_state_for_audio_prompt("alba")
+        return _load_voice_state_cached("alba", 0.0)
 
     if voice.guild_id == 0:
-        return model.get_state_for_audio_prompt(voice.name)
+        return _load_voice_state_cached(voice.name, 0.0)
 
-    if voice.processed_safetensor:
-        target_path = voice.processed_safetensor.path
-    elif voice.audio_source:
-        target_path = voice.audio_source.path
-    else:
+    target_path = _resolve_target_path(voice)
+    if not target_path:
         logger.warning(
             "Voice pk=%s has no audio source, using internal default.",
             voice_pk,
         )
-        return model.get_state_for_audio_prompt(voice.name)
-    return model.get_state_for_audio_prompt(target_path)
+        return _load_voice_state_cached(voice.name, 0.0)
+
+    try:
+        mtime = Path(target_path).stat().st_mtime
+    except OSError:
+        mtime = 0.0
+
+    return _load_voice_state_cached(target_path, mtime)
+
+
+get_cached_voice_state.cache_clear = reset_voice_cache  # type: ignore[attr-defined]
+get_cached_voice_state.cache_info = _load_voice_state_cached.cache_info  # type: ignore[attr-defined]
 
 
 @shared_task(ignore_result=True)
