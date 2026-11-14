@@ -21,15 +21,24 @@ def make_processed_safetensor_link(voice: Voice) -> str:
 @admin.register(Voice)
 class VoiceAdmin(admin.ModelAdmin):
     form = VoiceForm
+    autocomplete_fields = ("allowed_users",)
     list_display = (
         "name",
         "guild_id",
         "audio_source",
         "processed_safetensor",
+        "access_status",
     )
     list_filter = ("guild_id",)
     search_fields = ("name",)
     actions = ["regenerate_safetensors"]
+
+    @admin.display(description="Access")
+    def access_status(self, voice: Voice) -> str:
+        count = voice.allowed_users.count()
+        if count == 0:
+            return "Public"
+        return f"Restricted ({count} user{'s' if count != 1 else ''})"
 
     @admin.action(description="Regenerate safetensor for selected voice(s)")
     def regenerate_safetensors(self, request, queryset):

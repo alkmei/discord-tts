@@ -6,7 +6,7 @@ A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS
 
 - No GPU needed!
 - Voice cloning!
-- Use Django's built-in admin pages to manage voices!
+- Use Django's built-in admin pages to manage voices and restrict user access!
 - Automatic TTS for muted users (if configured with message intent)!
 
 ## Running the Bot
@@ -31,11 +31,22 @@ A Discord bot providing Text-to-Speech (TTS) in voice channels using [Pocket-TTS
 
 [Download WSL2](https://learn.microsoft.com/en-us/windows/wsl/install), then follow the instructions above.
 
-## Voice Cloning
+## Voice Cloning & Permissions
 
 - You must log into HuggingFace and accept the agreement in the [model page](https://huggingface.co/kyutai/pocket-tts). Then, provide HF_TOKEN as an environment variable.
 - Add new voices by logging into the admin panel and using that to upload audio files.
 - By default, Django's admin will be on `/admin` on port 8000. If the DJANGO_SUPERUSER_USERNAME and DJANGO_SUPERUSER_PASSWORD env variables are filled in, then it will automatically create an admin user of those types.
+
+### Limiting Voices to Specific Users
+
+Voices can be restricted to specific Discord users via the Django Admin panel:
+
+1. Navigate to `/admin` and open **Voices** under the Voices section.
+2. Select an existing voice or create a new one.
+3. Use the **Allowed users** field:
+   - **Empty (default)**: The voice is public and available to everyone in that server (or all servers if `guild_id` is 0).
+   - **Selected users**: The voice is restricted exclusively to the selected Discord accounts. Users not on the list will not see the voice in `/voices`, cannot pick it in `/voice`, and cannot trigger it via `/say`.
+4. If a user hasn't interacted with the bot yet, their Discord ID can be added under **Discord accounts** in the Common section.
 
 ## Dependency & Environment Setup
 
