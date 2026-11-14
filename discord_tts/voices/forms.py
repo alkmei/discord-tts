@@ -10,7 +10,14 @@ MAX_AUDIO_SIZE = MAX_AUDIO_SIZE_MB * 1024 * 1024
 class VoiceForm(forms.ModelForm):
     class Meta:
         model = Voice
-        fields = ["name", "guild_id", "audio_source"]
+        fields = ["name", "guild_id", "audio_source", "allowed_users"]
+        help_texts = {
+            "allowed_users": (
+                "Leave empty for server-wide public access. "
+                "If users are selected, only those users will be "
+                "able to use this voice."
+            ),
+        }
         widgets = {
             "audio_source": forms.FileInput(
                 attrs={
