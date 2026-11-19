@@ -13,14 +13,32 @@ def clean_tts_text(text: str) -> str:
     return "." + content
 
 
-def resolve_mentions_agnostic(text: str, member_map: dict[int, str]) -> str:
+def resolve_mentions_agnostic(
+    text: str,
+    member_map: dict[int, str] | None = None,
+    role_map: dict[int, str] | None = None,
+    channel_map: dict[int, str] | None = None,
+) -> str:
+    """Pass dicts of {id: name} to resolve user, role, and channel mentions
+
+    independent of the discord.py library.
     """
-    Pass a dict of {user_id: display_name} to keep this
-    function independent of the discord.py library.
-    """
+    members = member_map or {}
+    roles = role_map or {}
+    channels = channel_map or {}
+
+    transforms = {
+        "@": lambda i: f"@{members.get(i, 'someone')}",
+        "@!": lambda i: f"@{members.get(i, 'someone')}",
+        "@&": lambda i: f"@{roles.get(i, 'role')}",
+        "#": lambda i: f"#{channels.get(i, 'channel')}",
+    }
 
     def replace_mention(match: re.Match[str]) -> str:
-        user_id = int(match.group(1))
-        return member_map.get(user_id, "someone")
+        prefix = match.group(1)
+        target_id = int(match.group(2))
+        transform = transforms.get(prefix)
+        return transform(target_id) if transform else match.group(0)
 
-    return re.sub(r"<@!?(\d+)>", replace_mention, text)
+    # Resolve Discord user, role, and channel mentions: <@ID>, <@!ID>, <@&ID>, <#ID>
+    return re.sub(r"<(@[!&]?|#)(\d+)>", replace_mention, text)
