@@ -14,7 +14,16 @@ logger = logging.getLogger(__name__)
 
 def resolve_mentions(text: str, guild: discord.Guild) -> str:
     member_map = {member.id: member.display_name for member in guild.members}
-    return resolve_mentions_agnostic(text, member_map)
+    role_map = {role.id: role.name for role in guild.roles}
+    channel_map = {channel.id: channel.name for channel in guild.channels}
+    if hasattr(guild, "threads"):
+        channel_map.update({thread.id: thread.name for thread in guild.threads})
+    return resolve_mentions_agnostic(
+        text,
+        member_map=member_map,
+        role_map=role_map,
+        channel_map=channel_map,
+    )
 
 
 def start_tts_task(
