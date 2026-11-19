@@ -3,6 +3,7 @@ from django.contrib.admin.sites import AdminSite
 from django.core.files.uploadedfile import SimpleUploadedFile
 
 from discord_tts.common.models import DiscordAccount
+from discord_tts.speech.tasks import get_cached_voice_state
 from discord_tts.voices.admin import VoiceAdmin
 from discord_tts.voices.forms import VoiceForm
 from discord_tts.voices.interface import get_available_voices
@@ -24,6 +25,39 @@ class TestVoicePermissions:
         user2 = DiscordAccount.objects.create(discord_id=1002)
         voice.allowed_users.add(user2)
         assert admin.access_status(voice) == "Restricted (2 users)"
+
+    def test_regenerate_safetensors_admin_action_ignores_system_voices_and_clears_cache(
+        self,
+        monkeypatch,
+    ):
+        admin = VoiceAdmin(Voice, AdminSite())
+
+        system_voice = Voice.objects.filter(guild_id=0).first()
+        if not system_voice:
+            system_voice = Voice.objects.create(name="test_system_voice", guild_id=0)
+
+        user_voice = Voice.objects.create(name="custom_user_voice", guild_id=123)
+
+        regenerated = []
+        monkeypatch.setattr(
+            Voice,
+            "regenerate_safetensors",
+            lambda self: regenerated.append(self.pk),
+        )
+
+        cleared = []
+        monkeypatch.setattr(
+            get_cached_voice_state,
+            "cache_clear",
+            lambda: cleared.append(True),
+        )
+
+        queryset = Voice.objects.filter(pk__in=[system_voice.pk, user_voice.pk])
+        admin.regenerate_safetensors(request=None, queryset=queryset)
+
+        assert user_voice.pk in regenerated
+        assert system_voice.pk not in regenerated
+        assert len(cleared) == 1
 
     def test_voice_form_with_allowed_users(self):
         user = DiscordAccount.objects.create(discord_id=1001)

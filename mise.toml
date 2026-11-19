@@ -1,0 +1,3 @@
+[tools]
+mprocs = "latest"
+uv = "latest"

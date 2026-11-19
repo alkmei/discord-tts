@@ -16,18 +16,25 @@ Including another URLconf
 """
 
 from django.conf import settings
-from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import URLPattern
 from django.urls import URLResolver
 from django.urls import include
 from django.urls import path
+from django.urls import re_path
+from django.views.static import serve
 
 urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
     path("", include("discord_tts.speech.urls")),
+    re_path(
+        r"^%s(?P<path>.*)$" % settings.MEDIA_URL.lstrip("/"),
+        serve,
+        {"document_root": settings.MEDIA_ROOT},
+    ),
+    re_path(
+        r"^%s(?P<path>.*)$" % settings.STATIC_URL.lstrip("/"),
+        serve,
+        {"document_root": settings.STATIC_ROOT},
+    ),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
