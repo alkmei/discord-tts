@@ -1,0 +1,11 @@
+procs:
+  django:
+    shell: "uv run python manage.py runserver 0.0.0.0:8000"
+  celery:
+    shell: "uv run celery -A config worker --loglevel=info"
+  flower:
+    shell: "uv run celery -A config flower --port=5555"
+  bot:
+    shell: "uv run python -m bot.main"
+  infra:
+    shell: "docker compose up"

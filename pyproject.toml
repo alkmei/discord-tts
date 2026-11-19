@@ -42,7 +42,6 @@ dev = [
     "django-coverage-plugin>=3.2.2",
     "djlint>=1.40.3",
     "flower>=2.0.1",
-    "honcho>=2.0.0",
     "mypy>=2.1.0",
     "pytest>=9.1.1",
     "pytest-cov>=7.1.0",

@@ -6,8 +6,8 @@ makemigrations:  # Generate migration files
 migrate:  # Apply migrations
 	uv run python manage.py migrate
 
-dev:  # Start honcho with Procfile
-	uv run honcho start
+dev:  # Start mprocs
+	mprocs
 
 test: # Run pytest
 	uv run pytest
