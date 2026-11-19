@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.utils.html import format_html
 
+from discord_tts.speech.tasks import get_cached_voice_state
 from discord_tts.voices.forms import VoiceForm
 
 from .models import Voice
@@ -42,5 +43,8 @@ class VoiceAdmin(admin.ModelAdmin):
 
     @admin.action(description="Regenerate safetensor for selected voice(s)")
     def regenerate_safetensors(self, request, queryset):
-        for voice in queryset:
+        valid_voices = queryset.exclude(guild_id=0)
+        for voice in valid_voices:
             voice.regenerate_safetensors()
+
+        get_cached_voice_state.cache_clear()
