@@ -32,6 +32,7 @@ INSTALLED_APPS = [
     "discord_tts.voices",
     "discord_tts.speech",
     "discord_tts.common",
+    "django_cleanup.apps.CleanupConfig",
 ]
 
 MIDDLEWARE = [
